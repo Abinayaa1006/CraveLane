@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import API_URL from "../config";
+
+const API_URL = "http://127.0.0.1:5000";
+
 const CATEGORIES = [
     "All",
     "Indian",
@@ -62,27 +64,6 @@ export default function RestaurantsPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [toast, setToast] = useState("");
-
-    useEffect(() => {
-        function syncWishlist() {
-            setWishlist(readWishlist());
-        }
-
-        window.addEventListener("wishlistUpdated", syncWishlist);
-        window.addEventListener("storage", syncWishlist);
-
-        return () => {
-            window.removeEventListener("wishlistUpdated", syncWishlist);
-            window.removeEventListener("storage", syncWishlist);
-        };
-    }, []);
-
-    function showToast(message) {
-        setToast(message);
-        window.clearTimeout(showToast.timer);
-        showToast.timer = window.setTimeout(() => setToast(""), 2600);
-    }
 
     useEffect(() => {
         const requested = location.state?.category;
@@ -100,18 +81,9 @@ export default function RestaurantsPage() {
                 setLoading(true);
                 setError("");
 
-                const controller = new AbortController();
-                const timeoutId = window.setTimeout(() => controller.abort(), 12000);
-
-                let response;
-                try {
-                    response = await fetch(`${API_URL}/restaurants`, {
-                        method: "GET",
-                        signal: controller.signal
-                    });
-                } finally {
-                    window.clearTimeout(timeoutId);
-                }
+                const response = await fetch(
+                    `${API_URL}/restaurants`
+                );
 
                 if (!response.ok) {
                     throw new Error(
@@ -131,9 +103,8 @@ export default function RestaurantsPage() {
             } catch (err) {
                 if (!cancelled) {
                     setError(
-                        err.name === "AbortError"
-                            ? "The restaurant server took too long to respond. Check that Flask and MySQL are running."
-                            : err.message || "Could not connect to the restaurant server."
+                        err.message ||
+                        "Could not connect to the restaurant server."
                     );
                 }
             } finally {
@@ -186,38 +157,22 @@ export default function RestaurantsPage() {
 
         const id = Number(restaurant.Restaurant_ID);
 
-        const currentWishlist = readWishlist();
-
-        // Restaurant entries are legacy entries or explicitly marked restaurants.
-        // Food entries must never be mistaken for restaurant favourites.
-        const alreadySaved = currentWishlist.some(
-            (item) =>
-                item.type !== "item" &&
-                item.Menu_ID == null &&
-                Number(item.Restaurant_ID) === id
+        const alreadySaved = wishlist.some(
+            (item) => Number(item.Restaurant_ID) === id
         );
 
-        let updated;
-
-        if (alreadySaved) {
-            updated = currentWishlist.filter(
-                (item) =>
-                    item.type === "item" ||
-                    item.Menu_ID != null ||
-                    Number(item.Restaurant_ID) !== id
-            );
-            showToast(`${restaurant.Restaurant_Name || "Restaurant"} removed from wishlist.`);
-        } else {
-            updated = [
-                ...currentWishlist,
-                { ...restaurant, type: "restaurant" }
-            ];
-            showToast(`${restaurant.Restaurant_Name || "Restaurant"} added to wishlist.`);
-        }
+        const updated = alreadySaved
+            ? wishlist.filter(
+                (item) => Number(item.Restaurant_ID) !== id
+            )
+            : [...wishlist, restaurant];
 
         setWishlist(updated);
-        localStorage.setItem("wishlist", JSON.stringify(updated));
-        window.dispatchEvent(new Event("wishlistUpdated"));
+
+        localStorage.setItem(
+            "wishlist",
+            JSON.stringify(updated)
+        );
     }
 
     function clearFilters() {
@@ -230,12 +185,6 @@ export default function RestaurantsPage() {
             <Navbar />
 
             <main style={styles.content}>
-                {toast && (
-                    <div role="status" aria-live="polite" style={styles.toast}>
-                        ✓ {toast}
-                    </div>
-                )}
-
                 <header style={styles.header}>
                     <p style={styles.eyebrow}>
                         DISCOVER SOMETHING DELICIOUS
@@ -246,7 +195,7 @@ export default function RestaurantsPage() {
                     </h1>
 
                     <p style={styles.subtitle}>
-                        Choose from a variety of restaurants, cuisines, and locations to satisfy your cravings. Use the search and filters to find your perfect meal.
+                        Find your next favourite meal.
                     </p>
 
                     <input
@@ -346,8 +295,6 @@ export default function RestaurantsPage() {
 
                                     const isFavourite = wishlist.some(
                                         (item) =>
-                                            item.type !== "item" &&
-                                            item.Menu_ID == null &&
                                             Number(item.Restaurant_ID) ===
                                             Number(id)
                                     );
@@ -358,12 +305,14 @@ export default function RestaurantsPage() {
                                             style={styles.card}
                                             role="link"
                                             tabIndex={0}
-                                            aria-label={
-                                                `View ${restaurant.Restaurant_Name} menu`
-                                            }
-                                            onClick={() =>
-                                                openRestaurant(id)
-                                            }
+                                            aria-label={`View ${restaurant.Restaurant_Name} menu`}
+                                            onClickCapture={(event) => {
+                                                // Let the wishlist heart keep its own action.
+                                                if (event.target.closest("button")) {
+                                                    return;
+                                                }
+                                                openRestaurant(id);
+                                            }}
                                             onKeyDown={(event) => {
                                                 if (
                                                     event.key === "Enter" ||
@@ -710,17 +659,5 @@ const styles = {
         color: "#707070",
         background: "#fffaf0",
         borderRadius: "16px"
-    },
-
-    toast: {
-        position: "fixed",
-        top: "88px",
-        right: "22px",
-        zIndex: 1200,
-        padding: "13px 18px",
-        borderRadius: "10px",
-        background: "#242424",
-        color: "#fff",
-        boxShadow: "0 8px 25px #0002"
     }
 };

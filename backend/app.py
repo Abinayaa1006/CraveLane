@@ -1390,6 +1390,422 @@ def update_order_status(order_id):
 
 
 # =====================================================
+# CRAVELANE RATINGS & REVIEWS
+# =====================================================
+
+# GET RESTAURANT REVIEWS AND AVERAGE RATING
+# GET /restaurants/<restaurant_id>/reviews
+
+@app.route("/restaurants/<int:restaurant_id>/reviews", methods=["GET"])
+def get_restaurant_reviews(restaurant_id):
+
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT Restaurant_ID
+            FROM restaurant
+            WHERE Restaurant_ID = %s
+            """,
+            (restaurant_id,)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({"message": "Restaurant not found."}), 404
+
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS review_count,
+                ROUND(AVG(Rating), 1) AS average_rating
+            FROM review
+            WHERE Restaurant_ID = %s
+            """,
+            (restaurant_id,)
+        )
+
+        summary = cursor.fetchone()
+
+        cursor.execute(
+            """
+            SELECT
+                r.Review_ID,
+                r.Customer_ID,
+                c.Name AS Customer_Name,
+                r.Restaurant_ID,
+                r.Order_ID,
+                r.Rating,
+                r.Comments,
+                r.Review_Date
+            FROM review r
+            JOIN customer c
+                ON r.Customer_ID = c.Customer_ID
+            WHERE r.Restaurant_ID = %s
+            ORDER BY r.Review_Date DESC
+            """,
+            (restaurant_id,)
+        )
+
+        reviews = cursor.fetchall()
+
+        for review in reviews:
+            if review["Review_Date"]:
+                review["Review_Date"] = review["Review_Date"].isoformat()
+
+        return jsonify({
+            "average_rating": float(summary["average_rating"] or 0),
+            "review_count": summary["review_count"],
+            "reviews": reviews
+        }), 200
+
+    except Exception:
+        app.logger.exception("Could not fetch restaurant reviews")
+        return jsonify({
+            "message": "Could not fetch reviews."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# SUBMIT A RESTAURANT REVIEW
+# POST /reviews
+
+@app.route("/reviews", methods=["POST"])
+@require_auth
+def submit_review():
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        restaurant_id = int(data.get("restaurant_id"))
+        order_id = int(data.get("order_id"))
+        rating = int(data.get("rating"))
+
+        if restaurant_id <= 0 or order_id <= 0:
+            raise ValueError
+
+        if rating < 1 or rating > 5:
+            return jsonify({
+                "message": "Rating must be between 1 and 5."
+            }), 400
+
+    except (TypeError, ValueError):
+        return jsonify({
+            "message": "Valid restaurant, order and rating are required."
+        }), 400
+
+    comments = (data.get("comments") or "").strip()
+
+    if len(comments) > 2000:
+        return jsonify({
+            "message": "Review cannot exceed 2000 characters."
+        }), 400
+
+    customer_id = request.current_user["customer_id"]
+
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        cursor = db.cursor(dictionary=True)
+
+        # Verify that this customer owns a delivered order
+        # containing an item from this restaurant.
+
+        cursor.execute(
+            """
+            SELECT o.Order_ID
+            FROM orders o
+            JOIN order_item oi
+                ON o.Order_ID = oi.Order_ID
+            JOIN menu m
+                ON oi.Menu_ID = m.Menu_ID
+            WHERE o.Order_ID = %s
+              AND o.Customer_ID = %s
+              AND m.Restaurant_ID = %s
+              AND LOWER(TRIM(o.Order_Status)) = 'delivered'
+            LIMIT 1
+            """,
+            (order_id, customer_id, restaurant_id)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({
+                "message": (
+                    "You can review this restaurant only after "
+                    "your order containing its items is delivered."
+                )
+            }), 403
+
+        cursor.execute(
+            """
+            SELECT Review_ID
+            FROM review
+            WHERE Customer_ID = %s
+              AND Restaurant_ID = %s
+              AND Order_ID = %s
+            """,
+            (customer_id, restaurant_id, order_id)
+        )
+
+        if cursor.fetchone():
+            return jsonify({
+                "message": "You have already reviewed this restaurant for this order."
+            }), 409
+
+        cursor.execute(
+            """
+            INSERT INTO review (
+                Customer_ID,
+                Restaurant_ID,
+                Order_ID,
+                Rating,
+                Comments
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                customer_id,
+                restaurant_id,
+                order_id,
+                rating,
+                comments
+            )
+        )
+
+        review_id = cursor.lastrowid
+        db.commit()
+
+        return jsonify({
+            "message": "Your review was submitted successfully!",
+            "review_id": review_id
+        }), 201
+
+    except Exception:
+        if db:
+            db.rollback()
+
+        app.logger.exception("Could not submit review")
+
+        return jsonify({
+            "message": "Could not submit your review."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# GET ALL REVIEWS WRITTEN BY LOGGED-IN CUSTOMER
+# GET /my-reviews
+
+@app.route("/my-reviews", methods=["GET"])
+@require_auth
+def get_my_reviews():
+
+    customer_id = request.current_user["customer_id"]
+
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT
+                r.Review_ID,
+                r.Restaurant_ID,
+                res.Restaurant_Name,
+                r.Order_ID,
+                r.Rating,
+                r.Comments,
+                r.Review_Date
+            FROM review r
+            JOIN restaurant res
+                ON r.Restaurant_ID = res.Restaurant_ID
+            WHERE r.Customer_ID = %s
+            ORDER BY r.Review_Date DESC
+            """,
+            (customer_id,)
+        )
+
+        reviews = cursor.fetchall()
+
+        for review in reviews:
+            if review["Review_Date"]:
+                review["Review_Date"] = review["Review_Date"].isoformat()
+
+        return jsonify({
+            "reviews": reviews
+        }), 200
+
+    except Exception:
+        app.logger.exception("Could not fetch customer reviews")
+        return jsonify({
+            "message": "Could not fetch your reviews."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# EDIT OWN REVIEW
+# PUT /reviews/<review_id>
+
+@app.route("/reviews/<int:review_id>", methods=["PUT"])
+@require_auth
+def update_review(review_id):
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        rating = int(data.get("rating"))
+
+        if rating < 1 or rating > 5:
+            raise ValueError
+
+    except (TypeError, ValueError):
+        return jsonify({
+            "message": "Rating must be between 1 and 5."
+        }), 400
+
+    comments = (data.get("comments") or "").strip()
+
+    if len(comments) > 2000:
+        return jsonify({
+            "message": "Review cannot exceed 2000 characters."
+        }), 400
+
+    customer_id = request.current_user["customer_id"]
+
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        cursor = db.cursor()
+
+        cursor.execute(
+            """
+            UPDATE review
+            SET Rating = %s,
+                Comments = %s
+            WHERE Review_ID = %s
+              AND Customer_ID = %s
+            """,
+            (rating, comments, review_id, customer_id)
+        )
+
+        if cursor.rowcount == 0:
+            cursor.execute(
+                """
+                SELECT Review_ID
+                FROM review
+                WHERE Review_ID = %s
+                  AND Customer_ID = %s
+                """,
+                (review_id, customer_id)
+            )
+
+            if not cursor.fetchone():
+                return jsonify({
+                    "message": "Review not found or you are not authorized."
+                }), 404
+
+        db.commit()
+
+        return jsonify({
+            "message": "Review updated successfully."
+        }), 200
+
+    except Exception:
+        if db:
+            db.rollback()
+
+        app.logger.exception("Could not update review")
+
+        return jsonify({
+            "message": "Could not update your review."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# DELETE OWN REVIEW
+# DELETE /reviews/<review_id>
+
+@app.route("/reviews/<int:review_id>", methods=["DELETE"])
+@require_auth
+def delete_review(review_id):
+
+    customer_id = request.current_user["customer_id"]
+
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        cursor = db.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM review
+            WHERE Review_ID = %s
+              AND Customer_ID = %s
+            """,
+            (review_id, customer_id)
+        )
+
+        if cursor.rowcount == 0:
+            return jsonify({
+                "message": "Review not found or you are not authorized."
+            }), 404
+
+        db.commit()
+
+        return jsonify({
+            "message": "Review deleted successfully."
+        }), 200
+
+    except Exception:
+        if db:
+            db.rollback()
+
+        app.logger.exception("Could not delete review")
+
+        return jsonify({
+            "message": "Could not delete your review."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# =====================================================
 # ADMIN DASHBOARD STATISTICS
 # =====================================================
 

@@ -25,12 +25,14 @@ const highlights = [
     {
         title: "Biryani favourites",
         subtitle: "Aromatic, comforting and full of flavour",
-        image: foodImages.biryani
+        image: foodImages.biryani,
+        searchTerm: "biryani"
     },
     {
         title: "Pizza nights",
         subtitle: "Cheesy slices for every craving",
-        image: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?auto=format&fit=crop&w=900&q=85"
+        image: foodImages.pizza,
+        searchTerm: "pizza"
     }
 ];
 
@@ -38,16 +40,24 @@ export default function LandingPage() {
     const navigate = useNavigate();
     const [searchText, setSearchText] = useState("");
 
-    const goToRestaurants = (category) => {
-        navigate("/restaurants", {
-            state: category ? { category } : { search: searchText.trim() }
-        });
+    // Keep search and category navigation separate so a search is never reset by "All".
+    const goToRestaurants = (category = "", query = searchText) => {
+        if (category) {
+            navigate("/restaurants", { state: { category, search: "" } });
+            return;
+        }
+
+        navigate("/restaurants", { state: { search: String(query || "").trim() } });
+    };
+
+    const handleSearch = (event) => {
+        event.preventDefault();
+        goToRestaurants("", searchText);
     };
 
     return (
         <div className="cl-home">
             <Navbar />
-
             <main>
                 <section className="cl-hero">
                     <div className="cl-hero-copy">
@@ -55,22 +65,17 @@ export default function LandingPage() {
                         <h1>Find your next<br /><span>favourite meal.</span></h1>
                         <p>Discover great food from restaurants around you. Browse the menu, place your order, and enjoy every bite.</p>
 
-                        <div className="cl-search" role="search">
+                        <form className="cl-search" role="search" onSubmit={handleSearch}>
                             <span className="cl-search-icon" aria-hidden="true">⌕</span>
                             <input
                                 type="search"
                                 value={searchText}
                                 onChange={(event) => setSearchText(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter") goToRestaurants();
-                                }}
-                                placeholder="Search for restaurants or dishes"
-                                aria-label="Search for restaurants or dishes"
+                                placeholder="Search restaurants, dishes, cuisines or locations..."
+                                aria-label="Search restaurants, dishes, cuisines or locations"
                             />
-                            <button type="button" onClick={() => goToRestaurants()}>
-                                Search
-                            </button>
-                        </div>
+                            <button type="submit">Search</button>
+                        </form>
 
                         <div className="cl-hero-meta">
                             <span><b>01</b> Browse restaurants</span>
@@ -98,7 +103,7 @@ export default function LandingPage() {
                             <h2>What are you craving?</h2>
                             <p>Find something delicious, whatever you're in the mood for.</p>
                         </div>
-                        <button className="cl-link-button" type="button" onClick={() => goToRestaurants()}>
+                        <button className="cl-link-button" type="button" onClick={() => goToRestaurants("", "")}>
                             View all restaurants <span aria-hidden="true">→</span>
                         </button>
                     </div>
@@ -109,7 +114,7 @@ export default function LandingPage() {
                                 className="cl-category-card"
                                 key={category.name}
                                 type="button"
-                                onClick={() => goToRestaurants(category.name)}
+                                onClick={() => goToRestaurants(category.name, "")}
                             >
                                 <div className="cl-category-image-wrap">
                                     <img src={category.image} alt={`${category.name} cuisine`} loading="lazy" />
@@ -134,7 +139,12 @@ export default function LandingPage() {
                     </div>
                     <div className="cl-highlight-grid">
                         {highlights.map((item) => (
-                            <button className="cl-highlight-card" key={item.title} type="button" onClick={() => goToRestaurants()}>
+                            <button
+                                className="cl-highlight-card"
+                                key={item.title}
+                                type="button"
+                                onClick={() => goToRestaurants("", item.searchTerm)}
+                            >
                                 <img src={item.image} alt={item.title} loading="lazy" />
                                 <span className="cl-highlight-shade" />
                                 <span className="cl-highlight-text">
@@ -176,7 +186,7 @@ export default function LandingPage() {
                         <h2>Your next delicious meal is waiting.</h2>
                         <p>Explore the restaurants and find something you'll love.</p>
                     </div>
-                    <button type="button" onClick={() => goToRestaurants()}>
+                    <button type="button" onClick={() => goToRestaurants("", "")}>
                         Explore restaurants <span aria-hidden="true">→</span>
                     </button>
                 </section>

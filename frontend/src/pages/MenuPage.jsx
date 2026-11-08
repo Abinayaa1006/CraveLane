@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import RestaurantReviews from "../components/RestaurantReviews";
 
 import API_URL from "../config";
+
 
 function readWishlist() {
     try {
@@ -467,12 +469,15 @@ export default function MenuPage() {
                                 ))}
                             </section>
                         )}
+                        {/* RATINGS AND REVIEWS */}
+                     <RestaurantReviews restaurantId={id} />
                     </>
                 )}
             </main>
         </div>
     );
 }
+
 
 function getFoodEmoji(category = "") {
     const value = category.toLowerCase();

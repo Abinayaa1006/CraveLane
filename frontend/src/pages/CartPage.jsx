@@ -2,16 +2,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-
 import API_URL from "../config";
 
 export default function CartPage() {
     const navigate = useNavigate();
 
     const [cart, setCart] = useState([]);
-    const [restaurantNames, setRestaurantNames] = useState({});
+    const [restaurantDetails, setRestaurantDetails] = useState({});
     const [message, setMessage] = useState("");
 
+    // Load cart from localStorage
     useEffect(() => {
         try {
             const saved = JSON.parse(
@@ -23,9 +23,9 @@ export default function CartPage() {
         }
     }, []);
 
-    // Load actual restaurant names from the backend.
+    // Load restaurant names and images from backend
     useEffect(() => {
-        async function loadRestaurantNames() {
+        async function loadRestaurantDetails() {
             try {
                 const response = await fetch(`${API_URL}/restaurants`);
 
@@ -34,28 +34,51 @@ export default function CartPage() {
                 }
 
                 const restaurants = await response.json();
-                const names = {};
+                const details = {};
 
                 restaurants.forEach((restaurant) => {
-                    names[Number(restaurant.Restaurant_ID)] =
-                        restaurant.Restaurant_Name;
+                    const id = Number(
+                        restaurant.Restaurant_ID ??
+                        restaurant.restaurant_id
+                    );
+
+                    details[id] = {
+                        name:
+                            restaurant.Restaurant_Name ||
+                            restaurant.restaurant_name ||
+                            "",
+                        image:
+                            restaurant.Image_URL ||
+                            restaurant.image_url ||
+                            restaurant.ImageUrl ||
+                            restaurant.imageUrl ||
+                            restaurant.Restaurant_Image ||
+                            restaurant.restaurant_image ||
+                            restaurant.image ||
+                            ""
+                    };
                 });
 
-                setRestaurantNames(names);
+                setRestaurantDetails(details);
             } catch (error) {
-                console.error("Could not load restaurant names:", error);
+                console.error(
+                    "Could not load restaurant details:",
+                    error
+                );
             }
         }
 
-        loadRestaurantNames();
+        loadRestaurantDetails();
     }, []);
 
+    // Save cart
     function saveCart(updatedCart) {
         setCart(updatedCart);
         localStorage.setItem("cart", JSON.stringify(updatedCart));
         window.dispatchEvent(new Event("cartUpdated"));
     }
 
+    // Check whether two cart items are identical
     function isSameItem(a, b) {
         return (
             Number(a.Menu_ID) === Number(b.Menu_ID) &&
@@ -63,42 +86,57 @@ export default function CartPage() {
         );
     }
 
+    // Change item quantity
     function changeQuantity(item, amount) {
         const currentQuantity = Number(item.quantity || 1);
         const nextQuantity = currentQuantity + amount;
 
         const updated = cart
             .map((cartItem) => {
-                if (!isSameItem(cartItem, item)) return cartItem;
+                if (!isSameItem(cartItem, item)) {
+                    return cartItem;
+                }
 
                 return {
                     ...cartItem,
                     quantity: nextQuantity
                 };
             })
-            .filter((cartItem) => Number(cartItem.quantity) > 0);
+            .filter(
+                (cartItem) => Number(cartItem.quantity) > 0
+            );
 
         saveCart(updated);
 
         if (amount > 0) {
-            showMessage(`${item.Item_Name} added to your cart. Quantity: ${nextQuantity}.`);
+            showMessage(
+                `${item.Item_Name} added to your cart. Quantity: ${nextQuantity}.`
+            );
         } else if (nextQuantity <= 0) {
             showMessage(`${item.Item_Name} removed from your cart.`);
         } else {
-            showMessage(`${item.Item_Name} quantity decreased to ${nextQuantity}.`);
+            showMessage(
+                `${item.Item_Name} quantity decreased to ${nextQuantity}.`
+            );
         }
     }
 
+    // Remove individual item
     function removeItem(item) {
-        saveCart(cart.filter((cartItem) => !isSameItem(cartItem, item)));
+        saveCart(
+            cart.filter((cartItem) => !isSameItem(cartItem, item))
+        );
+
         showMessage(`${item.Item_Name} removed from your cart.`);
     }
 
+    // Clear entire cart
     function clearCart() {
         saveCart([]);
         showMessage("Your cart has been cleared.");
     }
 
+    // Toast notification
     function showMessage(text) {
         setMessage(text);
 
@@ -112,36 +150,41 @@ export default function CartPage() {
         }, 2800);
     }
 
+    // Total quantity
     const totalItems = cart.reduce(
         (sum, item) => sum + Number(item.quantity || 1),
         0
     );
 
+    // Subtotal
     const subtotal = useMemo(
         () =>
             cart.reduce(
                 (sum, item) =>
                     sum +
                     Number(item.Price || 0) *
-                        Number(item.quantity || 1),
+                    Number(item.quantity || 1),
                 0
             ),
         [cart]
     );
 
+    // Group cart items by restaurant
     const restaurantGroups = useMemo(() => {
         const groups = new Map();
 
         cart.forEach((item) => {
             const id = Number(item.Restaurant_ID);
+            const details = restaurantDetails[id] || {};
 
             if (!groups.has(id)) {
                 groups.set(id, {
                     id,
                     name:
-                        restaurantNames[id] ||
+                        details.name ||
                         item.Restaurant_Name ||
                         `Restaurant ID ${id}`,
+                    image: details.image || "",
                     items: []
                 });
             }
@@ -150,16 +193,73 @@ export default function CartPage() {
         });
 
         return Array.from(groups.values());
-    }, [cart, restaurantNames]);
+    }, [cart, restaurantDetails]);
 
     return (
         <div style={styles.page}>
             <style>{`
                 @keyframes cartToastIn {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                .cart-restaurant-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    margin-bottom: 18px;
+                    padding-bottom: 14px;
+                    border-bottom: 1px solid #eeeeee;
+                }
+
+                .cart-restaurant-image {
+                    width: 48px;
+                    height: 48px;
+                    object-fit: cover;
+                    border-radius: 10px;
+                    flex-shrink: 0;
+                }
+
+                .cart-restaurant-fallback {
+                    width: 48px;
+                    height: 48px;
+                    flex-shrink: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #fff4d9;
+                    border-radius: 10px;
+                    font-size: 24px;
+                }
+
+                .cart-restaurant-name {
+                    margin: 0;
+                    font-size: 18px;
+                    color: #252525;
+                }
+
+                @media (max-width: 600px) {
+                    .cart-item-row {
+                        grid-template-columns: 55px minmax(0, 1fr) !important;
+                    }
+
+                    .cart-item-row .cart-quantity {
+                        grid-column: 2;
+                        justify-self: start;
+                    }
+
+                    .cart-item-row .cart-line-total {
+                        grid-column: 2;
+                    }
                 }
             `}</style>
+
             <Navbar />
 
             <main style={styles.container}>
@@ -173,7 +273,9 @@ export default function CartPage() {
 
                 <header style={styles.header}>
                     <p style={styles.eyebrow}>YOUR SELECTION</p>
+
                     <h1 style={styles.heading}>My Cart</h1>
+
                     <p style={styles.subtitle}>
                         Everything you love, ready to order.
                     </p>
@@ -194,7 +296,9 @@ export default function CartPage() {
                 {cart.length === 0 ? (
                     <section style={styles.empty}>
                         <div style={styles.emptyIcon}>🛒</div>
+
                         <h2>Your cart is empty</h2>
+
                         <p>
                             Find your favourite restaurant and add some
                             delicious dishes.
@@ -228,101 +332,189 @@ export default function CartPage() {
                                     key={group.id}
                                     style={styles.restaurantGroup}
                                 >
-                                    <h3 style={styles.restaurantName}>
-                                        🍽️ {group.name}
-                                    </h3>
+                                    {/* Restaurant image and name */}
+                                    <div className="cart-restaurant-header">
+                                        {group.image ? (
+                                            <img
+                                                className="cart-restaurant-image"
+                                                src={group.image}
+                                                alt={group.name}
+                                                onError={(event) => {
+                                                    event.currentTarget.style.display =
+                                                        "none";
 
-                                    {group.items.map((item) => (
-                                        <article
-                                            key={`${item.Restaurant_ID}-${item.Menu_ID}`}
-                                            style={styles.item}
+                                                    const fallback =
+                                                        event.currentTarget
+                                                            .nextElementSibling;
+
+                                                    if (fallback) {
+                                                        fallback.style.display =
+                                                            "flex";
+                                                    }
+                                                }}
+                                            />
+                                        ) : null}
+
+                                        <div
+                                            className="cart-restaurant-fallback"
+                                            style={{
+                                                display: group.image
+                                                    ? "none"
+                                                    : "flex"
+                                            }}
                                         >
-                                            <div style={styles.foodIcon}>
-                                                {(item.Image_URL || item.image_url || item.ImageUrl || item.imageUrl || item.image) ? (
-                                                    <>
-                                                        <img
-                                                            src={item.Image_URL || item.image_url || item.ImageUrl || item.imageUrl || item.image}
-                                                            alt={item.Item_Name || "Food item"}
-                                                            style={styles.foodImage}
-                                                            onError={(event) => {
-                                                                event.currentTarget.style.display = "none";
-                                                                const fallback = event.currentTarget.nextElementSibling;
-                                                                if (fallback) fallback.style.display = "flex";
-                                                            }}
-                                                        />
-                                                        <span style={{ ...styles.foodImageFallback, display: "none" }}>
-                                                            {getFoodEmoji(item.Category)}
+                                            🍽️
+                                        </div>
+
+                                        <h3 className="cart-restaurant-name">
+                                            {group.name}
+                                        </h3>
+                                    </div>
+
+                                    {/* Restaurant food items */}
+                                    {group.items.map((item) => {
+                                        const foodImage =
+                                            item.Image_URL ||
+                                            item.image_url ||
+                                            item.ImageUrl ||
+                                            item.imageUrl ||
+                                            item.image;
+
+                                        return (
+                                            <article
+                                                key={`${item.Restaurant_ID}-${item.Menu_ID}`}
+                                                className="cart-item-row"
+                                                style={styles.item}
+                                            >
+                                                <div style={styles.foodIcon}>
+                                                    {foodImage ? (
+                                                        <>
+                                                            <img
+                                                                src={foodImage}
+                                                                alt={
+                                                                    item.Item_Name ||
+                                                                    "Food item"
+                                                                }
+                                                                style={styles.foodImage}
+                                                                onError={(event) => {
+                                                                    event.currentTarget.style.display =
+                                                                        "none";
+
+                                                                    const fallback =
+                                                                        event.currentTarget
+                                                                            .nextElementSibling;
+
+                                                                    if (fallback) {
+                                                                        fallback.style.display =
+                                                                            "flex";
+                                                                    }
+                                                                }}
+                                                            />
+
+                                                            <span
+                                                                style={{
+                                                                    ...styles.foodImageFallback,
+                                                                    display: "none"
+                                                                }}
+                                                            >
+                                                                {getFoodEmoji(
+                                                                    item.Category
+                                                                )}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span>
+                                                            {getFoodEmoji(
+                                                                item.Category
+                                                            )}
                                                         </span>
-                                                    </>
-                                                ) : (
-                                                    <span>{getFoodEmoji(item.Category)}</span>
-                                                )}
-                                            </div>
+                                                    )}
+                                                </div>
 
-                                            <div style={styles.itemDetails}>
-                                                <h4 style={styles.itemName}>
-                                                    {item.Item_Name}
-                                                </h4>
+                                                <div style={styles.itemDetails}>
+                                                    <h4 style={styles.itemName}>
+                                                        {item.Item_Name}
+                                                    </h4>
 
-                                                <p style={styles.category}>
-                                                    {item.Category || "Dish"}
-                                                </p>
+                                                    <p style={styles.category}>
+                                                        {item.Category || "Dish"}
+                                                    </p>
 
-                                                <strong style={styles.price}>
-                                                    ₹{Number(item.Price).toFixed(2)}
+                                                    <strong style={styles.price}>
+                                                        ₹
+                                                        {Number(
+                                                            item.Price || 0
+                                                        ).toFixed(2)}
+                                                    </strong>
+
+                                                    <button
+                                                        type="button"
+                                                        style={styles.removeButton}
+                                                        onClick={() =>
+                                                            removeItem(item)
+                                                        }
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+
+                                                <div
+                                                    className="cart-quantity"
+                                                    style={styles.quantityBox}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Decrease ${item.Item_Name}`}
+                                                        style={styles.quantityButton}
+                                                        onClick={() =>
+                                                            changeQuantity(
+                                                                item,
+                                                                -1
+                                                            )
+                                                        }
+                                                    >
+                                                        −
+                                                    </button>
+
+                                                    <span style={styles.quantity}>
+                                                        {Number(
+                                                            item.quantity || 1
+                                                        )}
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Increase ${item.Item_Name}`}
+                                                        style={styles.quantityButton}
+                                                        onClick={() =>
+                                                            changeQuantity(
+                                                                item,
+                                                                1
+                                                            )
+                                                        }
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+
+                                                <strong
+                                                    className="cart-line-total"
+                                                    style={styles.lineTotal}
+                                                >
+                                                    ₹
+                                                    {(
+                                                        Number(item.Price || 0) *
+                                                        Number(item.quantity || 1)
+                                                    ).toFixed(2)}
                                                 </strong>
-
-                                                <button
-                                                    type="button"
-                                                    style={styles.removeButton}
-                                                    onClick={() =>
-                                                        removeItem(item)
-                                                    }
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-
-                                            <div style={styles.quantityBox}>
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Decrease ${item.Item_Name}`}
-                                                    style={styles.quantityButton}
-                                                    onClick={() =>
-                                                        changeQuantity(item, -1)
-                                                    }
-                                                >
-                                                    −
-                                                </button>
-
-                                                <span style={styles.quantity}>
-                                                    {Number(item.quantity || 1)}
-                                                </span>
-
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Increase ${item.Item_Name}`}
-                                                    style={styles.quantityButton}
-                                                    onClick={() =>
-                                                        changeQuantity(item, 1)
-                                                    }
-                                                >
-                                                    +
-                                                </button>
-                                            </div>
-
-                                            <strong style={styles.lineTotal}>
-                                                ₹{(
-                                                    Number(item.Price) *
-                                                    Number(item.quantity || 1)
-                                                ).toFixed(2)}
-                                            </strong>
-                                        </article>
-                                    ))}
+                                            </article>
+                                        );
+                                    })}
                                 </section>
                             ))}
                         </section>
 
+                        {/* Order Summary */}
                         <aside style={styles.summary}>
                             <h2 style={styles.summaryTitle}>
                                 Order Summary
@@ -378,6 +570,7 @@ export default function CartPage() {
     );
 }
 
+// Food emoji fallback
 function getFoodEmoji(category = "") {
     const value = category.toLowerCase();
 
@@ -391,6 +584,7 @@ function getFoodEmoji(category = "") {
     return "🍽️";
 }
 
+// Page styles
 const styles = {
     page: {
         minHeight: "100vh",
@@ -398,6 +592,7 @@ const styles = {
         color: "#252525",
         fontFamily: "Arial, sans-serif"
     },
+
     container: {
         width: "90%",
         maxWidth: "1250px",
@@ -405,6 +600,7 @@ const styles = {
         padding: "30px 0 65px",
         boxSizing: "border-box"
     },
+
     backButton: {
         border: "none",
         background: "transparent",
@@ -413,23 +609,28 @@ const styles = {
         cursor: "pointer",
         padding: "10px 0"
     },
+
     header: {
         margin: "20px 0 30px"
     },
+
     eyebrow: {
         color: "#d71928",
         fontSize: "12px",
         fontWeight: "bold",
         letterSpacing: "2px"
     },
+
     heading: {
         fontSize: "clamp(32px, 4vw, 46px)",
         margin: "10px 0"
     },
+
     subtitle: {
         color: "#707070",
         lineHeight: "1.6"
     },
+
     toast: {
         position: "fixed",
         top: "88px",
@@ -450,6 +651,7 @@ const styles = {
         fontWeight: 600,
         animation: "cartToastIn 180ms ease-out"
     },
+
     toastIcon: {
         width: "24px",
         height: "24px",
@@ -462,6 +664,7 @@ const styles = {
         color: "#218838",
         fontWeight: 800
     },
+
     layout: {
         display: "grid",
         gridTemplateColumns:
@@ -469,9 +672,11 @@ const styles = {
         alignItems: "start",
         gap: "28px"
     },
+
     itemsColumn: {
         minWidth: 0
     },
+
     listHeader: {
         display: "flex",
         justifyContent: "space-between",
@@ -480,6 +685,7 @@ const styles = {
         flexWrap: "wrap",
         marginBottom: "18px"
     },
+
     restaurantGroup: {
         padding: "20px",
         marginBottom: "20px",
@@ -487,12 +693,7 @@ const styles = {
         borderRadius: "16px",
         background: "#ffffff"
     },
-    restaurantName: {
-        margin: "0 0 18px",
-        paddingBottom: "14px",
-        borderBottom: "1px solid #eeeeee",
-        fontSize: "18px"
-    },
+
     item: {
         display: "grid",
         gridTemplateColumns: "55px minmax(0, 1fr) auto",
@@ -501,6 +702,7 @@ const styles = {
         padding: "18px 0",
         borderBottom: "1px solid #f1f1f1"
     },
+
     foodIcon: {
         width: "55px",
         height: "55px",
@@ -513,12 +715,14 @@ const styles = {
         borderRadius: "12px",
         fontSize: "29px"
     },
+
     foodImage: {
         width: "100%",
         height: "100%",
         objectFit: "cover",
         display: "block"
     },
+
     foodImageFallback: {
         width: "100%",
         height: "100%",
@@ -526,21 +730,26 @@ const styles = {
         justifyContent: "center",
         fontSize: "29px"
     },
+
     itemDetails: {
         minWidth: 0
     },
+
     itemName: {
         margin: "0 0 5px",
         fontSize: "16px"
     },
+
     category: {
         margin: "0 0 7px",
         fontSize: "12px",
         color: "#777777"
     },
+
     price: {
         color: "#d71928"
     },
+
     removeButton: {
         display: "block",
         padding: "6px 0",
@@ -550,6 +759,7 @@ const styles = {
         cursor: "pointer",
         fontSize: "12px"
     },
+
     quantityBox: {
         display: "flex",
         alignItems: "center",
@@ -558,6 +768,7 @@ const styles = {
         borderRadius: "9px",
         padding: "5px"
     },
+
     quantityButton: {
         width: "27px",
         height: "27px",
@@ -567,27 +778,32 @@ const styles = {
         cursor: "pointer",
         fontWeight: "bold"
     },
+
     quantity: {
         minWidth: "15px",
         textAlign: "center",
         fontWeight: "bold"
     },
+
     lineTotal: {
         gridColumn: "2 / 4",
         justifySelf: "end",
         fontSize: "14px"
     },
+
     summary: {
         padding: "25px",
         background: "#fffaf0",
         border: "1px solid #f0e5cf",
         borderRadius: "16px"
     },
+
     summaryTitle: {
         marginTop: 0,
         marginBottom: "25px",
         fontSize: "23px"
     },
+
     summaryRow: {
         display: "flex",
         justifyContent: "space-between",
@@ -597,23 +813,27 @@ const styles = {
         color: "#666666",
         fontSize: "14px"
     },
+
     divider: {
         height: "1px",
         background: "#e8ddc7",
         margin: "22px 0"
     },
+
     totalRow: {
         display: "flex",
         justifyContent: "space-between",
         gap: "12px",
         fontSize: "18px"
     },
+
     note: {
         color: "#777777",
         fontSize: "12px",
         lineHeight: "1.6",
         margin: "20px 0"
     },
+
     primaryButton: {
         width: "100%",
         padding: "14px",
@@ -625,6 +845,7 @@ const styles = {
         cursor: "pointer",
         marginTop: "10px"
     },
+
     secondaryButton: {
         width: "100%",
         padding: "13px",
@@ -636,6 +857,7 @@ const styles = {
         fontWeight: "bold",
         cursor: "pointer"
     },
+
     clearButton: {
         border: "none",
         background: "transparent",
@@ -643,6 +865,7 @@ const styles = {
         cursor: "pointer",
         fontWeight: "bold"
     },
+
     empty: {
         textAlign: "center",
         padding: "65px 20px",
@@ -650,6 +873,7 @@ const styles = {
         borderRadius: "18px",
         background: "#fffaf0"
     },
+
     emptyIcon: {
         fontSize: "60px"
     }
