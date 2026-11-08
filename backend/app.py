@@ -216,7 +216,7 @@ def register():
         cursor = db.cursor()
 
         cursor.execute(
-            "SELECT Customer_ID FROM Customer WHERE Email = %s",
+            "SELECT Customer_ID FROM customer WHERE Email = %s",
             (email,)
         )
 
@@ -227,7 +227,7 @@ def register():
 
         cursor.execute(
             """
-            INSERT INTO Customer
+            INSERT INTO customer
                 (Name, Email, Phone, Password, Address, City, Pincode)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
@@ -445,7 +445,7 @@ def reset_password(token):
 
         hashed_password = generate_password_hash(new_password)
         cursor.execute(
-            "UPDATE Customer SET Password = %s WHERE Customer_ID = %s",
+            "UPDATE customer SET Password = %s WHERE Customer_ID = %s",
             (hashed_password, customer_id)
         )
         db.commit()
@@ -637,7 +637,7 @@ def update_profile(customer_id):
 
         cursor.execute(
             """
-            UPDATE Customer
+            UPDATE customer
             SET Name = %s,
                 Phone = %s,
                 Address = %s,
@@ -815,7 +815,7 @@ def place_order():
 
         cursor.execute(
             """
-            INSERT INTO Orders (
+            INSERT INTO orders (
                 Customer_ID, Total_Amount, Delivery_Address,
                 City, Pincode, Order_Status,
                 Payment_Method, Payment_Status
@@ -986,7 +986,7 @@ def create_razorpay_order():
 
         cursor.execute(
             """
-            INSERT INTO Orders (
+            INSERT INTO orders (
                 Customer_ID, Total_Amount, Delivery_Address,
                 City, Pincode, Order_Status, Payment_Method, Payment_Status,
                 Razorpay_Order_ID
@@ -1108,7 +1108,7 @@ def verify_razorpay_payment():
 
         cursor.execute(
             """
-            UPDATE Orders
+            UPDATE orders
             SET Payment_Status = 'Paid',
                 Razorpay_Payment_ID = %s
             WHERE Order_ID = %s AND Customer_ID = %s
@@ -1181,9 +1181,9 @@ def get_customer_orders(customer_id):
             FROM orders o
             LEFT JOIN order_item oi
                 ON o.Order_ID = oi.Order_ID
-            LEFT JOIN Menu m
+            LEFT JOIN menu m
                 ON oi.Menu_ID = m.Menu_ID
-            LEFT JOIN Restaurant r
+            LEFT JOIN restaurant r
                 ON m.Restaurant_ID = r.Restaurant_ID
             WHERE o.Customer_ID = %s
             ORDER BY o.Order_ID DESC
@@ -1511,9 +1511,9 @@ def admin_get_restaurants():
                 r.Rating AS rating,
                 r.Status AS status,
                 r.Image_URL AS image_url,
-                COUNT(m.Menu_ID) AS total_menu_items
+                COUNT(m.menu_ID) AS total_menu_items
             FROM restaurant r
-            LEFT JOIN Menu m ON m.Restaurant_ID = r.Restaurant_ID
+            LEFT JOIN menu m ON m.Restaurant_ID = r.Restaurant_ID
             GROUP BY
                 r.Restaurant_ID, r.Restaurant_Name, r.Description,
                 r.Phone, r.Address, r.City, r.Rating, r.Status, r.Image_URL
@@ -1561,7 +1561,7 @@ def admin_create_restaurant():
         cursor = db.cursor()
         cursor.execute(
             """
-            INSERT INTO Restaurant
+            INSERT INTO restaurant
                 (Restaurant_Name, Description, Phone, Address, City,
                  Rating, Status, Image_URL)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -1619,7 +1619,7 @@ def admin_update_restaurant(restaurant_id):
         cursor = db.cursor()
         cursor.execute(
             """
-            UPDATE Restaurant
+            UPDATE restaurant
             SET Restaurant_Name = %s,
                 Description = %s,
                 Phone = %s,
@@ -1770,7 +1770,7 @@ def admin_create_menu_item(restaurant_id):
 
         cursor.execute(
             """
-            INSERT INTO Menu
+            INSERT INTO menu
                 (Restaurant_ID, Item_Name, Description, Price,
                  Category, Availability, Image_URL)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -1831,7 +1831,7 @@ def admin_update_menu_item(menu_id):
         cursor = db.cursor()
         cursor.execute(
             """
-            UPDATE Menu
+            UPDATE menu
             SET Item_Name = %s,
                 Description = %s,
                 Price = %s,
@@ -1939,7 +1939,7 @@ def admin_get_customers():
                     ), 0
                 ) AS total_order_value
             FROM customer c
-            LEFT JOIN Orders o
+            LEFT JOIN orders o
                 ON c.Customer_ID = o.Customer_ID
             WHERE c.Role = 'customer'
             GROUP BY
@@ -2016,13 +2016,13 @@ def admin_get_orders():
                 oi.Quantity AS quantity,
                 oi.Unit_Price AS unit_price
             FROM orders o
-            LEFT JOIN Customer c
+            LEFT JOIN customer c
                 ON o.Customer_ID = c.Customer_ID
             LEFT JOIN order_item oi
                 ON o.Order_ID = oi.Order_ID
-            LEFT JOIN Menu m
+            LEFT JOIN menu m
                 ON oi.Menu_ID = m.Menu_ID
-            LEFT JOIN Restaurant r
+            LEFT JOIN restaurant r
                 ON m.Restaurant_ID = r.Restaurant_ID
             ORDER BY o.Order_ID DESC
             """
