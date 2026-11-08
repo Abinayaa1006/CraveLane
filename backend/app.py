@@ -484,7 +484,7 @@ def get_restaurants():
         cursor.execute(
             """
             SELECT *
-            FROM Restaurant
+            FROM restaurant
             ORDER BY Restaurant_ID
             """
         )
@@ -521,7 +521,7 @@ def get_restaurant_menu(restaurant_id):
         cursor.execute(
             """
             SELECT Restaurant_ID, Restaurant_Name, Image_URL
-            FROM Restaurant
+            FROM restaurant
             WHERE Restaurant_ID = %s
             """,
             (restaurant_id,)
@@ -538,7 +538,7 @@ def get_restaurant_menu(restaurant_id):
             """
             SELECT Menu_ID, Restaurant_ID, Item_Name,
                    Description, Price, Category, Availability, Image_URL
-            FROM Menu
+            FROM menu
             WHERE Restaurant_ID = %s
               AND Availability = TRUE
             ORDER BY Menu_ID
