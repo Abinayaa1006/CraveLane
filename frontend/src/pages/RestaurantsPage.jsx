@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import API_URL from "../config";
 
-const CATEGORIES = ["All", "Indian", "Chinese", "Italian", "Fast Food", "Healthy"];
+const CATEGORIES = ["All", "Indian", "Chinese", "Italian", "Healthy"];
 
 function getCuisine(restaurant) {
     const stored = restaurant.Cuisine ?? restaurant.cuisine;
@@ -14,7 +14,6 @@ function getCuisine(restaurant) {
     if (name.includes("pizza")) return "Italian";
     if (name.includes("dragon")) return "Chinese";
     if (name.includes("green")) return "Healthy";
-    if (name.includes("burger")) return "Fast Food";
     return "Restaurant";
 }
 
@@ -81,7 +80,6 @@ function getFoodEmoji(cuisine) {
         Indian: "🍛",
         Chinese: "🥡",
         Italian: "🍕",
-        "Fast Food": "🍔",
         Healthy: "🥗"
     };
     return emojis[cuisine] || "🍽️";
@@ -100,7 +98,6 @@ export default function RestaurantsPage() {
     });
     const [search, setSearch] = useState(() => location.state?.search || "");
     const [loading, setLoading] = useState(true);
-    const [menusLoading, setMenusLoading] = useState(true);
     const [error, setError] = useState("");
     const [toast, setToast] = useState("");
 
@@ -108,7 +105,12 @@ export default function RestaurantsPage() {
         const category = location.state?.category;
         const query = location.state?.search;
 
-        if (typeof query === "string") {
+        // Category navigation from the home page sends an empty search string.
+        // Check the category first, otherwise the empty string resets it to "All".
+        if (CATEGORIES.includes(category) && (!query || !String(query).trim())) {
+            setSelectedCategory(category);
+            setSearch("");
+        } else if (typeof query === "string") {
             setSearch(query);
             setSelectedCategory("All");
         } else if (CATEGORIES.includes(category)) {
@@ -139,39 +141,28 @@ export default function RestaurantsPage() {
                 const restaurantData = await response.json();
                 if (!Array.isArray(restaurantData)) throw new Error("The server returned an invalid restaurant list.");
                 if (cancelled) return;
-                // Show restaurant results immediately. Do not make the page wait for
-                // every restaurant's menu request to finish.
                 setRestaurants(restaurantData);
-                setLoading(false);
 
-                // Load menus in the background so dish matches appear progressively.
-                setMenusLoading(true);
-                const menuTasks = restaurantData.map(async (restaurant) => {
-                    const id = getRestaurantId(restaurant);
-                    if (id == null) return;
-
-                    try {
-                        const menuResponse = await fetch(`${API_URL}/restaurants/${id}/menu`);
-                        if (!menuResponse.ok) return;
-                        const menuData = await menuResponse.json();
-                        if (!cancelled) {
-                            setMenusByRestaurant((previous) => ({
-                                ...previous,
-                                [String(id)]: getMenuArray(menuData)
-                            }));
+                // Public endpoint returns an array of available menu rows for each restaurant.
+                const menuResults = await Promise.all(
+                    restaurantData.map(async (restaurant) => {
+                        const id = getRestaurantId(restaurant);
+                        if (id == null) return ["", []];
+                        try {
+                            const menuResponse = await fetch(`${API_URL}/restaurants/${id}/menu`);
+                            if (!menuResponse.ok) return [String(id), []];
+                            const menuData = await menuResponse.json();
+                            return [String(id), getMenuArray(menuData)];
+                        } catch {
+                            return [String(id), []];
                         }
-                    } catch (menuError) {
-                        // Keep restaurant search usable even if one menu request fails.
-                        console.warn(`Could not load menu for restaurant ${id}:`, menuError);
-                    }
-                });
-
-                await Promise.allSettled(menuTasks);
-                if (!cancelled) setMenusLoading(false);
+                    })
+                );
+                if (!cancelled) setMenusByRestaurant(Object.fromEntries(menuResults));
             } catch (err) {
                 if (!cancelled) setError(err.message || "Could not connect to the restaurant server.");
+            } finally {
                 if (!cancelled) setLoading(false);
-                if (!cancelled) setMenusLoading(false);
             }
         }
 
@@ -188,7 +179,13 @@ export default function RestaurantsPage() {
             const id = getRestaurantId(restaurant);
             const cuisine = getCuisine(restaurant);
             const restaurantText = normalizeText(`${getFieldsText(restaurant)} ${cuisine}`);
-            const categoryMatches = selectedCategory === "All" || normalizeText(cuisine) === normalizeText(selectedCategory);
+            const normalizedCuisine = normalizeText(cuisine);
+            const normalizedCategory = normalizeText(selectedCategory);
+            const categoryMatches =
+                selectedCategory === "All" ||
+                normalizedCuisine === normalizedCategory ||
+                normalizedCuisine.includes(normalizedCategory) ||
+                (normalizedCategory === "indian" && normalizedCuisine.includes("indian"));
 
             if (!categoryMatches) return;
 
@@ -293,12 +290,7 @@ export default function RestaurantsPage() {
                             <span style={styles.count}>{totalResults} result{totalResults === 1 ? "" : "s"}</span>
                         </div>
 
-                        {totalResults === 0 && hasSearch && menusLoading ? (
-                            <div style={styles.message}>
-                                <h2>Searching dishes...</h2>
-                                <p>Restaurant results are ready. Checking the menus for matching dishes.</p>
-                            </div>
-                        ) : totalResults === 0 ? (
+                        {totalResults === 0 ? (
                             <div style={styles.message}>
                                 <div style={{ fontSize: 45 }}>🔎</div>
                                 <h2>No exact matches found</h2>

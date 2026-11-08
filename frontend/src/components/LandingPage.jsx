@@ -7,7 +7,6 @@ const foodImages = {
     indian: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=700&q=85",
     italian: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?auto=format&fit=crop&w=700&q=85",
     chinese: "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=700&q=85",
-    fastFood: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=85",
     healthy: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=700&q=85",
     biryani: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=900&q=85",
     pizza: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?auto=format&fit=crop&w=900&q=85",
@@ -17,7 +16,6 @@ const categories = [
     { name: "Indian", description: "Curries, thalis & regional favourites", image: foodImages.indian },
     { name: "Italian", description: "Pizza, pasta & more", image: foodImages.italian },
     { name: "Chinese", description: "Noodles, rice & Asian favourites", image: foodImages.chinese },
-    { name: "Fast Food", description: "Burgers, fries & quick bites", image: foodImages.fastFood },
     { name: "Healthy", description: "Fresh bowls & wholesome meals", image: foodImages.healthy }
 ];
 
