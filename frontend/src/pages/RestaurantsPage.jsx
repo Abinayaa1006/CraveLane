@@ -347,7 +347,19 @@ export default function RestaurantsPage() {
                                                 const image = restaurant.Image_URL ?? restaurant.image_url;
                                                 const isFavourite = wishlist.some((item) => item.type !== "item" && item.Menu_ID == null && Number(item.Restaurant_ID ?? item.restaurant_id) === Number(id));
                                                 return (
-                                                    <article key={id} style={styles.card}>
+                                                    <article
+    key={id}
+    style={{ ...styles.card, cursor: "pointer" }}
+    role="link"
+    tabIndex={0}
+    onClick={() => openRestaurant(restaurant)}
+    onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openRestaurant(restaurant);
+        }
+    }}
+>
                                                         <div style={styles.foodImage}>
                                                             {image ? <img src={image} alt={`${name}`} style={styles.foodImagePhoto} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span style={styles.foodEmoji}>{getFoodEmoji(cuisine)}</span>}
                                                             <span style={styles.cuisineBadge}>{cuisine}</span>
