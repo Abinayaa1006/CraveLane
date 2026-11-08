@@ -1003,7 +1003,7 @@ def create_razorpay_order():
         for item in order_items:
             cursor.execute(
                 """
-                INSERT INTO Order_Item (Order_ID, Menu_ID, Quantity, Unit_Price)
+                INSERT INTO order_item (Order_ID, Menu_ID, Quantity, Unit_Price)
                 VALUES (%s, %s, %s, %s)
                 """,
                 (internal_order_id, item["menu_id"], item["quantity"], item["unit_price"])
@@ -1179,7 +1179,7 @@ def get_customer_orders(customer_id):
                 oi.Quantity,
                 oi.Unit_Price
             FROM orders o
-            LEFT JOIN Order_Item oi
+            LEFT JOIN order_item oi
                 ON o.Order_ID = oi.Order_ID
             LEFT JOIN Menu m
                 ON oi.Menu_ID = m.Menu_ID
@@ -2018,7 +2018,7 @@ def admin_get_orders():
             FROM orders o
             LEFT JOIN Customer c
                 ON o.Customer_ID = c.Customer_ID
-            LEFT JOIN Order_Item oi
+            LEFT JOIN order_item oi
                 ON o.Order_ID = oi.Order_ID
             LEFT JOIN Menu m
                 ON oi.Menu_ID = m.Menu_ID
