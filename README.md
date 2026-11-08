@@ -528,3 +528,39 @@ Developed as a full-stack academic software project.
 ### License
 
 This project is developed for academic and learning purposes. Add an appropriate open-source license before permitting reuse or redistribution.
+
+## 📸 Application Screenshots
+
+### Home Page
+![CraveLane Home](screenshots/home.png)
+
+### Restaurant Listings
+![Restaurants](screenshots/restaurants.png)
+
+### Restaurant Menu
+![Menu](screenshots/menu.png)
+
+### Shopping Cart
+![Cart](screenshots/cart.png)
+
+### Checkout
+![Checkout](screenshots/checkout.png)
+
+### Order History
+![Orders](screenshots/orders.png)
+
+### Wishlist
+![Wishlist](screenshots/wishlist.png)
+
+### Ratings and Reviews
+![Reviews](screenshots/reviews.png)
+
+### Admin Dashboard
+![Admin Dashboard](screenshots/admin-dashboard.png)
+
+### Order Management
+![Order Management](screenshots/order-management.png)
+
+### Restaurant Management
+![Restaurant Management](screenshots/restaurant-management.png)
+
