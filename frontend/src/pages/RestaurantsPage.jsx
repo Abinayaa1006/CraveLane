@@ -100,6 +100,7 @@ export default function RestaurantsPage() {
     });
     const [search, setSearch] = useState(() => location.state?.search || "");
     const [loading, setLoading] = useState(true);
+    const [menusLoading, setMenusLoading] = useState(true);
     const [error, setError] = useState("");
     const [toast, setToast] = useState("");
 
@@ -138,28 +139,39 @@ export default function RestaurantsPage() {
                 const restaurantData = await response.json();
                 if (!Array.isArray(restaurantData)) throw new Error("The server returned an invalid restaurant list.");
                 if (cancelled) return;
+                // Show restaurant results immediately. Do not make the page wait for
+                // every restaurant's menu request to finish.
                 setRestaurants(restaurantData);
+                setLoading(false);
 
-                // Public endpoint returns an array of available menu rows for each restaurant.
-                const menuResults = await Promise.all(
-                    restaurantData.map(async (restaurant) => {
-                        const id = getRestaurantId(restaurant);
-                        if (id == null) return ["", []];
-                        try {
-                            const menuResponse = await fetch(`${API_URL}/restaurants/${id}/menu`);
-                            if (!menuResponse.ok) return [String(id), []];
-                            const menuData = await menuResponse.json();
-                            return [String(id), getMenuArray(menuData)];
-                        } catch {
-                            return [String(id), []];
+                // Load menus in the background so dish matches appear progressively.
+                setMenusLoading(true);
+                const menuTasks = restaurantData.map(async (restaurant) => {
+                    const id = getRestaurantId(restaurant);
+                    if (id == null) return;
+
+                    try {
+                        const menuResponse = await fetch(`${API_URL}/restaurants/${id}/menu`);
+                        if (!menuResponse.ok) return;
+                        const menuData = await menuResponse.json();
+                        if (!cancelled) {
+                            setMenusByRestaurant((previous) => ({
+                                ...previous,
+                                [String(id)]: getMenuArray(menuData)
+                            }));
                         }
-                    })
-                );
-                if (!cancelled) setMenusByRestaurant(Object.fromEntries(menuResults));
+                    } catch (menuError) {
+                        // Keep restaurant search usable even if one menu request fails.
+                        console.warn(`Could not load menu for restaurant ${id}:`, menuError);
+                    }
+                });
+
+                await Promise.allSettled(menuTasks);
+                if (!cancelled) setMenusLoading(false);
             } catch (err) {
                 if (!cancelled) setError(err.message || "Could not connect to the restaurant server.");
-            } finally {
                 if (!cancelled) setLoading(false);
+                if (!cancelled) setMenusLoading(false);
             }
         }
 
@@ -281,7 +293,12 @@ export default function RestaurantsPage() {
                             <span style={styles.count}>{totalResults} result{totalResults === 1 ? "" : "s"}</span>
                         </div>
 
-                        {totalResults === 0 ? (
+                        {totalResults === 0 && hasSearch && menusLoading ? (
+                            <div style={styles.message}>
+                                <h2>Searching dishes...</h2>
+                                <p>Restaurant results are ready. Checking the menus for matching dishes.</p>
+                            </div>
+                        ) : totalResults === 0 ? (
                             <div style={styles.message}>
                                 <div style={{ fontSize: 45 }}>🔎</div>
                                 <h2>No exact matches found</h2>
@@ -338,20 +355,7 @@ export default function RestaurantsPage() {
                                                 const image = restaurant.Image_URL ?? restaurant.image_url;
                                                 const isFavourite = wishlist.some((item) => item.type !== "item" && item.Menu_ID == null && Number(item.Restaurant_ID ?? item.restaurant_id) === Number(id));
                                                 return (
-                                                    <article
-                                                        key={id}
-                                                        style={{ ...styles.card, cursor: "pointer" }}
-                                                        role="link"
-                                                        tabIndex={0}
-                                                        aria-label={`View ${name} menu`}
-                                                        onClick={() => openRestaurant(restaurant)}
-                                                        onKeyDown={(event) => {
-                                                            if (event.key === "Enter" || event.key === " ") {
-                                                                event.preventDefault();
-                                                                openRestaurant(restaurant);
-                                                            }
-                                                        }}
-                                                    >
+                                                    <article key={id} style={styles.card}>
                                                         <div style={styles.foodImage}>
                                                             {image ? <img src={image} alt={`${name}`} style={styles.foodImagePhoto} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span style={styles.foodEmoji}>{getFoodEmoji(cuisine)}</span>}
                                                             <span style={styles.cuisineBadge}>{cuisine}</span>
@@ -412,7 +416,7 @@ const styles = {
     dishRestaurant: { color: "#444", fontSize: 13, fontWeight: "bold", margin: "7px 0" },
     dishLocation: { color: "#707070", fontSize: 12, margin: "5px 0" },
     restaurantGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 270px), 320px))", gap: 24, justifyContent: "start", alignItems: "stretch" },
-    card: { minWidth: 0, width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #eee", borderRadius: 18, overflow: "hidden", boxShadow: "0 5px 22px rgba(0,0,0,0.06)", cursor: "pointer" },
+    card: { minWidth: 0, width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #eee", borderRadius: 18, overflow: "hidden", boxShadow: "0 5px 22px rgba(0,0,0,0.06)" },
     foodImage: { height: 170, width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", background: "#fff0bd" },
     foodEmoji: { fontSize: 70 },
     foodImagePhoto: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" },
