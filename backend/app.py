@@ -25,6 +25,7 @@ CORS(
     origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://cravelane.vercel.app"
     ],
     supports_credentials=True
 )
