@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-
-const API_URL = "http://127.0.0.1:5000";
+import API_URL from "../config";
 
 const CATEGORIES = [
     "All",
@@ -56,6 +55,7 @@ export default function RestaurantsPage() {
     const location = useLocation();
 
     const [restaurants, setRestaurants] = useState([]);
+    const [restaurantSearchIndex, setRestaurantSearchIndex] = useState({});
     const [wishlist, setWishlist] = useState(readWishlist);
     const [selectedCategory, setSelectedCategory] = useState(() => {
         const requested = location.state?.category;
@@ -99,7 +99,56 @@ export default function RestaurantsPage() {
                     );
                 }
 
-                if (!cancelled) setRestaurants(data);
+                // Build a search index from each restaurant's menu as well.
+                // This allows searches such as "Paneer Butter Masala" to
+                // return the restaurant that serves that dish.
+                const menuResults = await Promise.all(
+                    data.map(async (restaurant) => {
+                        const restaurantId = restaurant.Restaurant_ID;
+
+                        try {
+                            const menuResponse = await fetch(
+                                `${API_URL}/restaurants/${restaurantId}/menu`
+                            );
+
+                            if (!menuResponse.ok) {
+                                return [restaurantId, []];
+                            }
+
+                            const menuItems = await menuResponse.json();
+
+                            if (!Array.isArray(menuItems)) {
+                                return [restaurantId, []];
+                            }
+
+                            const dishSearchText = menuItems
+                                .flatMap((item) => [
+                                    item.Item_Name,
+                                    item.Description,
+                                    item.Category
+                                ])
+                                .filter(Boolean)
+                                .join(" ");
+
+                            return [restaurantId, dishSearchText];
+                        } catch (menuError) {
+                            // A menu failure should not prevent the
+                            // restaurant list from being displayed.
+                            console.warn(
+                                `Could not load menu for restaurant ${restaurantId}:`,
+                                menuError
+                            );
+                            return [restaurantId, ""];
+                        }
+                    })
+                );
+
+                if (!cancelled) {
+                    setRestaurants(data);
+                    setRestaurantSearchIndex(
+                        Object.fromEntries(menuResults)
+                    );
+                }
             } catch (err) {
                 if (!cancelled) {
                     setError(
@@ -135,7 +184,8 @@ export default function RestaurantsPage() {
                 restaurant.Description,
                 restaurant.Address,
                 restaurant.City,
-                cuisine
+                cuisine,
+                restaurantSearchIndex[restaurant.Restaurant_ID]
             ]
                 .filter(Boolean)
                 .join(" ")
@@ -146,7 +196,7 @@ export default function RestaurantsPage() {
                 searchableText.includes(term)
             );
         });
-    }, [restaurants, selectedCategory, search]);
+    }, [restaurants, restaurantSearchIndex, selectedCategory, search]);
 
     function openRestaurant(id) {
         navigate(`/restaurants/${id}`);
@@ -303,25 +353,7 @@ export default function RestaurantsPage() {
                                         <article
                                             key={id}
                                             style={styles.card}
-                                            role="link"
-                                            tabIndex={0}
-                                            aria-label={`View ${restaurant.Restaurant_Name} menu`}
-                                            onClickCapture={(event) => {
-                                                // Let the wishlist heart keep its own action.
-                                                if (event.target.closest("button")) {
-                                                    return;
-                                                }
-                                                openRestaurant(id);
-                                            }}
-                                            onKeyDown={(event) => {
-                                                if (
-                                                    event.key === "Enter" ||
-                                                    event.key === " "
-                                                ) {
-                                                    event.preventDefault();
-                                                    openRestaurant(id);
-                                                }
-                                            }}
+                                            onClick={() => openRestaurant(id)}
                                         >
                                             <div
                                                 style={{
