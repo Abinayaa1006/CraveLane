@@ -938,7 +938,7 @@ def create_razorpay_order():
         cursor = db.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT Customer_ID, Name, Email, Phone FROM Customer WHERE Customer_ID = %s",
+            "SELECT Customer_ID, Name, Email, Phone FROM customer WHERE Customer_ID = %s",
             (customer_id,)
         )
         customer = cursor.fetchone()
