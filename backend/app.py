@@ -580,7 +580,7 @@ def get_profile(customer_id):
             """
             SELECT Customer_ID, Name, Email, Phone,
                    Address, City, Pincode
-            FROM Customer
+            FROM customer
             WHERE Customer_ID = %s
             """,
             (customer_id,)
@@ -652,7 +652,7 @@ def update_profile(customer_id):
             cursor.execute(
                 """
                 SELECT Customer_ID
-                FROM Customer
+                FROM customer
                 WHERE Customer_ID = %s
                 """,
                 (customer_id,)
@@ -779,7 +779,7 @@ def place_order():
             cursor.execute(
                 """
                 SELECT Menu_ID, Item_Name, Price, Availability
-                FROM Menu
+                FROM menu
                 WHERE Menu_ID = %s
                 FOR UPDATE
                 """,
@@ -952,7 +952,7 @@ def create_razorpay_order():
             cursor.execute(
                 """
                 SELECT Menu_ID, Item_Name, Price, Availability
-                FROM Menu WHERE Menu_ID = %s FOR UPDATE
+                FROM menu WHERE Menu_ID = %s FOR UPDATE
                 """,
                 (menu_id,)
             )
@@ -1067,7 +1067,7 @@ def verify_razorpay_payment():
         cursor.execute(
             """
             SELECT Order_ID, Customer_ID, Total_Amount, Payment_Status, Razorpay_Order_ID, Payment_Method
-            FROM Orders
+            FROM orders
             WHERE Order_ID = %s AND Customer_ID = %s
             """,
             (internal_order_id, customer_id)
@@ -1178,7 +1178,7 @@ def get_customer_orders(customer_id):
                 m.Image_URL AS image_url,
                 oi.Quantity,
                 oi.Unit_Price
-            FROM Orders o
+            FROM orders o
             LEFT JOIN Order_Item oi
                 ON o.Order_ID = oi.Order_ID
             LEFT JOIN Menu m
@@ -1269,7 +1269,7 @@ def get_order_status(order_id):
         cursor.execute(
             """
             SELECT Order_ID, Order_Status
-            FROM Orders
+            FROM orders
             WHERE Order_ID = %s
             """,
             (order_id,)
@@ -1408,7 +1408,7 @@ def admin_dashboard_stats():
         # Total orders
         cursor.execute("""
             SELECT COUNT(*) AS total_orders
-            FROM Orders
+            FROM orders
         """)
 
         order_result = cursor.fetchone()
@@ -1425,7 +1425,7 @@ def admin_dashboard_stats():
                     END
                 ), 0
             ) AS total_revenue
-            FROM Orders
+            FROM orders
         """)
 
         revenue_result = cursor.fetchone()
@@ -1434,7 +1434,7 @@ def admin_dashboard_stats():
         # Registered customers (excluding admin accounts)
         cursor.execute("""
             SELECT COUNT(*) AS total_customers
-            FROM Customer
+            FROM customer
             WHERE Role = 'customer'
         """)
 
@@ -1444,7 +1444,7 @@ def admin_dashboard_stats():
         # Total restaurants
         cursor.execute("""
             SELECT COUNT(*) AS total_restaurants
-            FROM Restaurant
+            FROM restaurant
         """)
 
         restaurant_result = cursor.fetchone()
@@ -1512,7 +1512,7 @@ def admin_get_restaurants():
                 r.Status AS status,
                 r.Image_URL AS image_url,
                 COUNT(m.Menu_ID) AS total_menu_items
-            FROM Restaurant r
+            FROM restaurant r
             LEFT JOIN Menu m ON m.Restaurant_ID = r.Restaurant_ID
             GROUP BY
                 r.Restaurant_ID, r.Restaurant_Name, r.Description,
@@ -1714,7 +1714,7 @@ def admin_get_restaurant_menu(restaurant_id):
                    Category AS category,
                    Availability AS availability,
                    Image_URL AS image_url
-            FROM Menu
+            FROM menu
             WHERE Restaurant_ID = %s
             ORDER BY Menu_ID DESC
             """,
@@ -1938,7 +1938,7 @@ def admin_get_customers():
                         END
                     ), 0
                 ) AS total_order_value
-            FROM Customer c
+            FROM customer c
             LEFT JOIN Orders o
                 ON c.Customer_ID = o.Customer_ID
             WHERE c.Role = 'customer'
@@ -2015,7 +2015,7 @@ def admin_get_orders():
                 m.Item_Name AS item_name,
                 oi.Quantity AS quantity,
                 oi.Unit_Price AS unit_price
-            FROM Orders o
+            FROM orders o
             LEFT JOIN Customer c
                 ON o.Customer_ID = c.Customer_ID
             LEFT JOIN Order_Item oi
