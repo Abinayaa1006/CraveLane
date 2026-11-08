@@ -288,7 +288,7 @@ def login():
         cursor.execute(
             """
             SELECT Customer_ID, Name, Email, Password, Role
-            FROM Customer
+            FROM customer
             WHERE Email = %s
             """,
             (email,)
