@@ -18,6 +18,11 @@ export default function AdminDashboard() {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [databaseStatus, setDatabaseStatus] = useState(null);
+    const [databaseLoading, setDatabaseLoading] = useState(false);
+    const [databaseError, setDatabaseError] = useState("");
+    const [databaseMessage, setDatabaseMessage] = useState("");
+    const [selectedDatabase, setSelectedDatabase] = useState("mysql");
 
     let admin = {};
 
@@ -82,9 +87,53 @@ export default function AdminDashboard() {
         }
     }, [navigate]);
 
+    const fetchDatabaseStatus = useCallback(async () => {
+        setDatabaseLoading(true);
+        setDatabaseError("");
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${API_URL}/admin/database/health`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || "Could not load database status.");
+            }
+            setDatabaseStatus(data);
+        } catch (err) {
+            setDatabaseError(err.message || "Could not connect to database monitoring.");
+        } finally {
+            setDatabaseLoading(false);
+        }
+    }, []);
+
+    const triggerSync = async () => {
+        setDatabaseMessage("");
+        setDatabaseError("");
+        try {
+            const response = await fetch(`${API_URL}/admin/database/trigger-sync`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || "Could not trigger synchronization.");
+            }
+            setDatabaseMessage(data.message || "Sync workflow triggered.");
+            window.setTimeout(fetchDatabaseStatus, 2500);
+        } catch (err) {
+            setDatabaseError(err.message || "Could not trigger synchronization.");
+        }
+    };
+
     useEffect(() => {
         fetchStats();
-    }, [fetchStats]);
+        fetchDatabaseStatus();
+    }, [fetchStats, fetchDatabaseStatus]);
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -312,6 +361,150 @@ export default function AdminDashboard() {
 
                     </div>
 
+                </section>
+
+                {/* DATABASE MONITORING */}
+                <section className="admin-content-card" style={{ marginTop: "26px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                        <div>
+                            <h2>Database & Sync Monitoring</h2>
+                            <p style={{ marginTop: "5px", color: "#777" }}>
+                                MySQL is the primary database. MongoDB stores its synchronized copy.
+                            </p>
+                        </div>
+                        <div style={{ display: "flex", gap: "9px", flexWrap: "wrap" }}>
+                            <button className="admin-refresh" type="button" onClick={fetchDatabaseStatus} disabled={databaseLoading}>
+                                {databaseLoading ? "Checking..." : "↻ Refresh status"}
+                            </button>
+                            <button className="admin-refresh" type="button" onClick={triggerSync}>
+                                Run MongoDB sync
+                            </button>
+                        </div>
+                    </div>
+
+                    {databaseError && <div className="admin-error" role="alert" style={{ marginTop: "14px" }}>{databaseError}</div>}
+                    {databaseMessage && <p role="status" style={{ color: "#16803c", marginTop: "12px" }}>{databaseMessage}</p>}
+
+                    <div style={{ display: "flex", gap: "10px", margin: "18px 0", flexWrap: "wrap" }}>
+                        {[
+                            { key: "mysql", label: "MySQL · Primary" },
+                            { key: "mongodb", label: "MongoDB · Replica" }
+                        ].map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => setSelectedDatabase(item.key)}
+                                style={{
+                                    border: selectedDatabase === item.key ? "1px solid #e43b3b" : "1px solid #ddd",
+                                    background: selectedDatabase === item.key ? "#fff1f1" : "#fff",
+                                    color: selectedDatabase === item.key ? "#c62828" : "#444",
+                                    borderRadius: "9px",
+                                    padding: "9px 15px",
+                                    cursor: "pointer",
+                                    fontWeight: 600
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {databaseLoading && !databaseStatus ? (
+                        <p>Checking database connections...</p>
+                    ) : databaseStatus ? (
+                        <>
+                            {(() => {
+                                const selected = databaseStatus[selectedDatabase] || {};
+                                const counts = selected.counts || {};
+                                const labels = [
+                                    ["customers", "Customers"],
+                                    ["restaurants", "Restaurants"],
+                                    ["menu_items", "Menu items"],
+                                    ["orders", "Orders"],
+                                    ["reviews", "Reviews"]
+                                ];
+                                return (
+                                    <>
+                                        <div style={{
+                                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                                            gap: "10px", flexWrap: "wrap", padding: "13px 15px",
+                                            background: "#fafafa", border: "1px solid #eee", borderRadius: "10px"
+                                        }}>
+                                            <div>
+                                                <strong>{selectedDatabase === "mysql" ? "MySQL" : "MongoDB Atlas"}</strong>
+                                                <p style={{ margin: "4px 0 0", color: "#777", fontSize: "13px" }}>
+                                                    Database: {selected.database || (selectedDatabase === "mysql" ? "railway" : "cravelane")}
+                                                </p>
+                                            </div>
+                                            <strong style={{ color: selected.connected ? "#16803c" : "#c62828" }}>
+                                                {selected.connected ? "● Connected" : "● Disconnected"}
+                                            </strong>
+                                        </div>
+                                        <div style={{
+                                            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))",
+                                            gap: "12px", marginTop: "14px"
+                                        }}>
+                                            {labels.map(([key, label]) => (
+                                                <div key={key} style={{ border: "1px solid #eee", borderRadius: "10px", padding: "14px" }}>
+                                                    <small style={{ color: "#777" }}>{label}</small>
+                                                    <h2 style={{ margin: "7px 0 0", fontSize: "24px" }}>
+                                                        {selected.connected ? Number(counts[key] || 0).toLocaleString("en-IN") : "—"}
+                                                    </h2>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                            <div style={{ marginTop: "22px" }}>
+                                <h3 style={{ marginBottom: "12px" }}>Synchronization queue</h3>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "10px" }}>
+                                    {[
+                                        ["pending", "Pending"],
+                                        ["processing", "Processing"],
+                                        ["processed", "Processed"],
+                                        ["failed", "Failed"]
+                                    ].map(([key, label]) => (
+                                        <div key={key} style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: "9px", padding: "12px" }}>
+                                            <small style={{ color: "#777" }}>{label}</small>
+                                            <strong style={{ display: "block", fontSize: "21px", marginTop: "5px" }}>
+                                                {databaseStatus.sync?.available ? Number(databaseStatus.sync[key] || 0) : "—"}
+                                            </strong>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div style={{ marginTop: "20px", overflowX: "auto" }}>
+                                <h3 style={{ marginBottom: "10px" }}>Recent sync events</h3>
+                                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "560px", fontSize: "13px" }}>
+                                    <thead>
+                                        <tr style={{ textAlign: "left", background: "#fafafa" }}>
+                                            {["Event", "Entity", "Record ID", "Operation", "Status", "Attempts"].map((heading) => (
+                                                <th key={heading} style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>{heading}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(databaseStatus.sync?.recent_events || []).map((event) => (
+                                            <tr key={event.Event_ID}>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0" }}>#{event.Event_ID}</td>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0" }}>{event.Entity_Type}</td>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0" }}>{event.Entity_ID}</td>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0" }}>{event.Operation}</td>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0", color: event.Status === "processed" ? "#16803c" : event.Status === "failed" ? "#c62828" : "#9a6700" }}>{event.Status}</td>
+                                                <td style={{ padding: "10px 8px", borderBottom: "1px solid #f0f0f0" }}>{event.Attempts}</td>
+                                            </tr>
+                                        ))}
+                                        {(!databaseStatus.sync?.recent_events || databaseStatus.sync.recent_events.length === 0) && (
+                                            <tr><td colSpan="6" style={{ padding: "14px 8px", color: "#777" }}>No synchronization events found.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <p style={{ color: "#777" }}>Database status has not been loaded yet.</p>
+                    )}
                 </section>
 
                 {/* DASHBOARD INFORMATION */}

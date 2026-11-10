@@ -1,4 +1,7 @@
 import os
+import json
+import urllib.request
+import urllib.error
 import razorpay
 from dotenv import load_dotenv
 
@@ -17,6 +20,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from database.mysql_db import get_connection
 from database.sync_outbox import enqueue_sync_event
+from database.mongodb import connect_mongodb, close_mongodb
 
 
 app = Flask(__name__)
@@ -2535,6 +2539,181 @@ def admin_get_orders():
             cursor.close()
         if db:
             db.close()
+
+
+
+
+# =====================================================
+# ADMIN DATABASE MONITORING & SYNC CONTROL
+# =====================================================
+
+@app.route("/admin/database/health", methods=["GET"])
+@require_admin
+def admin_database_health():
+    """Return MySQL/MongoDB counts and transactional outbox status."""
+    mysql_db = None
+    mysql_cursor = None
+    mongo_connected = False
+    mongo_counts = {}
+    mysql_counts = {}
+    outbox = {
+        "pending": 0,
+        "processing": 0,
+        "processed": 0,
+        "failed": 0,
+        "recent_events": []
+    }
+
+    try:
+        mysql_db = get_connection()
+        mysql_cursor = mysql_db.cursor(dictionary=True)
+
+        mysql_tables = {
+            "customers": "customer",
+            "restaurants": "restaurant",
+            "menu_items": "menu",
+            "orders": "orders",
+            "reviews": "review"
+        }
+
+        for label, table_name in mysql_tables.items():
+            mysql_cursor.execute(f"SELECT COUNT(*) AS total FROM `{table_name}`")
+            row = mysql_cursor.fetchone()
+            mysql_counts[label] = int(row["total"] or 0)
+
+        try:
+            mysql_cursor.execute("""
+                SELECT Status, COUNT(*) AS total
+                FROM sync_outbox
+                GROUP BY Status
+            """)
+            for row in mysql_cursor.fetchall():
+                status = (row.get("Status") or "").lower()
+                if status in outbox:
+                    outbox[status] = int(row["total"] or 0)
+
+            mysql_cursor.execute("""
+                SELECT Event_ID, Entity_Type, Entity_ID, Operation,
+                       Status, Attempts, Created_At, Processed_At, Last_Error
+                FROM sync_outbox
+                ORDER BY Event_ID DESC
+                LIMIT 10
+            """)
+            events = mysql_cursor.fetchall()
+            for event in events:
+                for date_key in ("Created_At", "Processed_At"):
+                    if event.get(date_key):
+                        event[date_key] = event[date_key].isoformat()
+                event["Event_ID"] = int(event["Event_ID"])
+                event["Entity_ID"] = int(event["Entity_ID"])
+                event["Attempts"] = int(event["Attempts"] or 0)
+                # Avoid exposing stack traces or secrets in Last_Error.
+                if event.get("Last_Error"):
+                    event["Last_Error"] = str(event["Last_Error"])[:300]
+            outbox["recent_events"] = events
+        except Exception:
+            app.logger.exception("Could not read sync_outbox")
+            outbox["available"] = False
+        else:
+            outbox["available"] = True
+
+    except Exception:
+        app.logger.exception("Could not read MySQL monitoring data")
+        return jsonify({"message": "Could not load MySQL database status."}), 500
+    finally:
+        if mysql_cursor:
+            mysql_cursor.close()
+        if mysql_db:
+            mysql_db.close()
+
+    try:
+        mongo_db = connect_mongodb()
+        mongo_connected = True
+        mongo_collections = {
+            "customers": "customers",
+            "restaurants": "restaurants",
+            "menu_items": "menu_items",
+            "orders": "orders",
+            "reviews": "reviews"
+        }
+        for label, collection_name in mongo_collections.items():
+            mongo_counts[label] = mongo_db[collection_name].count_documents({})
+    except Exception:
+        app.logger.exception("Could not read MongoDB monitoring data")
+    finally:
+        close_mongodb()
+
+    return jsonify({
+        "mysql": {
+            "connected": True,
+            "database": os.getenv("DB_NAME", "railway"),
+            "counts": mysql_counts
+        },
+        "mongodb": {
+            "connected": mongo_connected,
+            "database": os.getenv("MONGO_DB_NAME", "cravelane"),
+            "counts": mongo_counts
+        },
+        "sync": outbox
+    }), 200
+
+
+@app.route("/admin/database/trigger-sync", methods=["POST"])
+@require_admin
+def admin_trigger_database_sync():
+    """Dispatch the existing GitHub Actions workflow_dispatch workflow."""
+    token = os.getenv("GITHUB_ACTIONS_TOKEN")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    workflow = os.getenv("GITHUB_SYNC_WORKFLOW", "mongo-sync.yml")
+    branch = os.getenv("GITHUB_SYNC_BRANCH", "main")
+
+    if not token or not repository:
+        return jsonify({
+            "message": (
+                "GitHub sync trigger is not configured. Set "
+                "GITHUB_ACTIONS_TOKEN and GITHUB_REPOSITORY on the backend."
+            )
+        }), 503
+
+    if "/" not in repository or repository.startswith("/") or repository.endswith("/"):
+        return jsonify({"message": "GITHUB_REPOSITORY must be owner/repository."}), 500
+
+    url = (
+        f"https://api.github.com/repos/{repository}/actions/workflows/"
+        f"{workflow}/dispatches"
+    )
+    payload = json.dumps({"ref": branch}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "CraveLane-Admin"
+        }
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            if response.status not in (204, 200):
+                return jsonify({"message": "GitHub did not accept the workflow trigger."}), 502
+        return jsonify({
+            "message": "MongoDB synchronization workflow dispatched successfully."
+        }), 202
+    except urllib.error.HTTPError as exc:
+        app.logger.error("GitHub workflow dispatch failed with HTTP %s", exc.code)
+        return jsonify({
+            "message": (
+                "GitHub rejected the workflow trigger. Check the token permissions, "
+                "repository name and workflow filename."
+            )
+        }), 502
+    except Exception:
+        app.logger.exception("Could not dispatch MongoDB sync workflow")
+        return jsonify({"message": "Could not contact GitHub Actions."}), 502
 
 
 # --------------------------------------------------
