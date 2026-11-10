@@ -16,6 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 from database.mysql_db import get_connection
+from database.sync_outbox import enqueue_sync_event
 
 
 app = Flask(__name__)
@@ -235,6 +236,15 @@ def register():
                 name, email, phone, hashed_password,
                 address, city, pincode
             )
+        )
+
+        customer_id = cursor.lastrowid
+
+        enqueue_sync_event(
+            cursor,
+            "customer",
+            customer_id,
+            "upsert"
         )
 
         db.commit()
@@ -663,6 +673,13 @@ def update_profile(customer_id):
                     "message": "Customer not found."
                 }), 404
 
+        enqueue_sync_event(
+            cursor,
+            "customer",
+            customer_id,
+            "upsert"
+        )
+
         db.commit()
 
         return jsonify({
@@ -835,6 +852,7 @@ def place_order():
         )
 
         order_id = cursor.lastrowid
+        enqueue_sync_event(cursor, "orders", order_id, "upsert")
 
         for item in order_items:
             cursor.execute(
@@ -999,6 +1017,7 @@ def create_razorpay_order():
             )
         )
         internal_order_id = cursor.lastrowid
+        enqueue_sync_event(cursor, "orders", internal_order_id, "upsert")
 
         for item in order_items:
             cursor.execute(
@@ -1115,6 +1134,7 @@ def verify_razorpay_payment():
             """,
             (payment_id, internal_order_id, customer_id)
         )
+        enqueue_sync_event(cursor, "orders", internal_order_id, "upsert")
         db.commit()
 
         return jsonify({
@@ -1363,6 +1383,7 @@ def update_order_status(order_id):
             """,
             (new_status, order_id)
         )
+        enqueue_sync_event(cursor, "orders", order_id, "upsert")
 
         db.commit()
 
@@ -1584,6 +1605,7 @@ def submit_review():
         )
 
         review_id = cursor.lastrowid
+        enqueue_sync_event(cursor, "review", review_id, "upsert")
         db.commit()
 
         return jsonify({
@@ -1729,6 +1751,7 @@ def update_review(review_id):
                     "message": "Review not found or you are not authorized."
                 }), 404
 
+        enqueue_sync_event(cursor, "review", review_id, "upsert")
         db.commit()
 
         return jsonify({
@@ -1782,6 +1805,7 @@ def delete_review(review_id):
                 "message": "Review not found or you are not authorized."
             }), 404
 
+        enqueue_sync_event(cursor, "review", review_id, "delete")
         db.commit()
 
         return jsonify({
@@ -1994,6 +2018,7 @@ def admin_create_restaurant():
             )
         )
         restaurant_id = cursor.lastrowid
+        enqueue_sync_event(cursor, "restaurant", restaurant_id, "upsert")
         db.commit()
         return jsonify({
             "message": "Restaurant added successfully.",
@@ -2060,6 +2085,7 @@ def admin_update_restaurant(restaurant_id):
             cursor.execute("SELECT Restaurant_ID FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
             if not cursor.fetchone():
                 return jsonify({"message": "Restaurant not found."}), 404
+        enqueue_sync_event(cursor, "restaurant", restaurant_id, "upsert")
         db.commit()
         return jsonify({"message": "Restaurant updated successfully."}), 200
 
@@ -2087,6 +2113,7 @@ def admin_delete_restaurant(restaurant_id):
         cursor.execute("DELETE FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
         if cursor.rowcount == 0:
             return jsonify({"message": "Restaurant not found."}), 404
+        enqueue_sync_event(cursor, "restaurant", restaurant_id, "delete")
         db.commit()
         return jsonify({"message": "Restaurant deleted successfully."}), 200
 
@@ -2202,6 +2229,7 @@ def admin_create_menu_item(restaurant_id):
             )
         )
         menu_id = cursor.lastrowid
+        enqueue_sync_event(cursor, "menu", menu_id, "upsert")
         db.commit()
         return jsonify({"message": "Menu item added successfully.", "menu_id": menu_id}), 201
 
@@ -2270,6 +2298,7 @@ def admin_update_menu_item(menu_id):
             cursor.execute("SELECT Menu_ID FROM Menu WHERE Menu_ID = %s", (menu_id,))
             if not cursor.fetchone():
                 return jsonify({"message": "Menu item not found."}), 404
+        enqueue_sync_event(cursor, "menu", menu_id, "upsert")
         db.commit()
         return jsonify({"message": "Menu item updated successfully."}), 200
 
@@ -2297,6 +2326,7 @@ def admin_delete_menu_item(menu_id):
         cursor.execute("DELETE FROM Menu WHERE Menu_ID = %s", (menu_id,))
         if cursor.rowcount == 0:
             return jsonify({"message": "Menu item not found."}), 404
+        enqueue_sync_event(cursor, "menu", menu_id, "delete")
         db.commit()
         return jsonify({"message": "Menu item deleted successfully."}), 200
 
