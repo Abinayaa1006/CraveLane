@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import argparse
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -278,22 +279,45 @@ def stop_worker(_signum, _frame):
     STOP = True
 
 
+
 def main():
-    signal.signal(signal.SIGINT, stop_worker)
-    signal.signal(signal.SIGTERM, stop_worker)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Process one batch and exit"
+    )
+    args = parser.parse_args()
+
     mongo_db = connect_mongodb()
     log.info("Connected to MongoDB database %s", mongo_db.name)
+
     try:
         mongo_db["customers"].create_index("email", unique=True)
         mongo_db["reviews"].create_index(
-            [("customer_id", 1), ("restaurant_id", 1), ("order_id", 1)],
+            [
+                ("customer_id", 1),
+                ("restaurant_id", 1),
+                ("order_id", 1)
+            ],
             unique=True,
         )
+
         recover_stale_locks()
+
+        if args.once:
+            count = run_once(mongo_db)
+            log.info("One-time sync completed. Events processed: %s", count)
+            return
+
+        signal.signal(signal.SIGINT, stop_worker)
+        signal.signal(signal.SIGTERM, stop_worker)
+
         while not STOP:
             count = run_once(mongo_db)
             if count == 0:
                 time.sleep(POLL_SECONDS)
+
     finally:
         close_mongodb()
         log.info("MongoDB sync worker stopped")
