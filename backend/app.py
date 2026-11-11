@@ -2704,13 +2704,15 @@ def admin_trigger_database_sync():
             "message": "MongoDB synchronization workflow dispatched successfully."
         }), 202
     except urllib.error.HTTPError as exc:
-        app.logger.error("GitHub workflow dispatch failed with HTTP %s", exc.code)
-        return jsonify({
-            "message": (
-                "GitHub rejected the workflow trigger. Check the token permissions, "
-                "repository name and workflow filename."
-            )
-        }), 502
+              error_body = exc.read().decode("utf-8", errors="replace")
+              app.logger.error(
+                   "GitHub dispatch failed: HTTP %s - %s",
+                    exc.code,
+                    error_body
+              )
+              return jsonify({
+        "message": f"GitHub rejected the request (HTTP {exc.code}). Check backend logs."
+    }), 502
     except Exception:
         app.logger.exception("Could not dispatch MongoDB sync workflow")
         return jsonify({"message": "Could not contact GitHub Actions."}), 502
