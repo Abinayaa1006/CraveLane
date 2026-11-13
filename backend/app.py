@@ -369,7 +369,7 @@ def forgot_password():
         db = get_connection()
         cursor = db.cursor(dictionary=True)
         cursor.execute(
-            "SELECT Customer_ID, Email FROM Customer WHERE Email = %s",
+            "SELECT Customer_ID, Email FROM customer WHERE Email = %s",
             (email,)
         )
         customer = cursor.fetchone()
@@ -451,7 +451,7 @@ def reset_password(token):
         db = get_connection()
         cursor = db.cursor()
         cursor.execute(
-            "SELECT Customer_ID FROM Customer WHERE Customer_ID = %s AND Email = %s",
+            "SELECT Customer_ID FROM customer WHERE Customer_ID = %s AND Email = %s",
             (customer_id, email)
         )
 
@@ -784,7 +784,7 @@ def place_order():
         cursor = db.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT Customer_ID FROM Customer WHERE Customer_ID = %s",
+            "SELECT Customer_ID FROM customer WHERE Customer_ID = %s",
             (customer_id,)
         )
 
@@ -862,7 +862,7 @@ def place_order():
         for item in order_items:
             cursor.execute(
                 """
-                INSERT INTO Order_Item (
+                INSERT INTO order_item (
                     Order_ID, Menu_ID, Quantity, Unit_Price
                 )
                 VALUES (%s, %s, %s, %s)
@@ -1465,7 +1465,7 @@ def update_order_status(order_id):
         cursor = db.cursor()
 
         cursor.execute(
-            "SELECT Order_ID FROM Orders WHERE Order_ID = %s",
+            "SELECT Order_ID FROM orders WHERE Order_ID = %s",
             (order_id,)
         )
 
@@ -1476,7 +1476,7 @@ def update_order_status(order_id):
 
         cursor.execute(
             """
-            UPDATE Orders
+            UPDATE orders
             SET Order_Status = %s
             WHERE Order_ID = %s
             """,
@@ -2183,7 +2183,7 @@ def admin_update_restaurant(restaurant_id):
             )
         )
         if cursor.rowcount == 0:
-            cursor.execute("SELECT Restaurant_ID FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
+            cursor.execute("SELECT Restaurant_ID FROM restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
             if not cursor.fetchone():
                 return jsonify({"message": "Restaurant not found."}), 404
         enqueue_sync_event(cursor, "restaurant", restaurant_id, "upsert")
@@ -2211,7 +2211,7 @@ def admin_delete_restaurant(restaurant_id):
     try:
         db = get_connection()
         cursor = db.cursor()
-        cursor.execute("DELETE FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
+        cursor.execute("DELETE FROM restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
         if cursor.rowcount == 0:
             return jsonify({"message": "Restaurant not found."}), 404
         enqueue_sync_event(cursor, "restaurant", restaurant_id, "delete")
@@ -2244,7 +2244,7 @@ def admin_get_restaurant_menu(restaurant_id):
     try:
         db = get_connection()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT Restaurant_ID FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
+        cursor.execute("SELECT Restaurant_ID FROM restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
         if not cursor.fetchone():
             return jsonify({"message": "Restaurant not found."}), 404
 
@@ -2308,7 +2308,7 @@ def admin_create_menu_item(restaurant_id):
     try:
         db = get_connection()
         cursor = db.cursor()
-        cursor.execute("SELECT Restaurant_ID FROM Restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
+        cursor.execute("SELECT Restaurant_ID FROM restaurant WHERE Restaurant_ID = %s", (restaurant_id,))
         if not cursor.fetchone():
             return jsonify({"message": "Restaurant not found."}), 404
 
@@ -2396,7 +2396,7 @@ def admin_update_menu_item(menu_id):
             )
         )
         if cursor.rowcount == 0:
-            cursor.execute("SELECT Menu_ID FROM Menu WHERE Menu_ID = %s", (menu_id,))
+            cursor.execute("SELECT Menu_ID FROM menu WHERE Menu_ID = %s", (menu_id,))
             if not cursor.fetchone():
                 return jsonify({"message": "Menu item not found."}), 404
         enqueue_sync_event(cursor, "menu", menu_id, "upsert")
@@ -2424,7 +2424,7 @@ def admin_delete_menu_item(menu_id):
     try:
         db = get_connection()
         cursor = db.cursor()
-        cursor.execute("DELETE FROM Menu WHERE Menu_ID = %s", (menu_id,))
+        cursor.execute("DELETE FROM menu WHERE Menu_ID = %s", (menu_id,))
         if cursor.rowcount == 0:
             return jsonify({"message": "Menu item not found."}), 404
         enqueue_sync_event(cursor, "menu", menu_id, "delete")
