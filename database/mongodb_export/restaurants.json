@@ -1,0 +1,56 @@
+[{
+  "_id": 1,
+  "restaurant_id": 1,
+  "restaurant_name": "Spice Garden",
+  "description": "Authentic Indian Cuisine",
+  "phone": "9876543210",
+  "address": "Anna Nagar",
+  "city": "Chennai",
+  "rating": {
+    "$numberDecimal": "4.5"
+  },
+  "status": "Open",
+  "image_url": "https://images.openai.com/static-rsc-4/AXXVXWs9X-FQRsPAQUyRFZ8NgwGmfWQbu1ZTH9j3UZWaLtRhT6zIvgI1DRHyF_lNRCkds00xI_tmt9Ym2xGNnRyGk7dSpXqn046X4Hh_R4rMyRzA0b9UmcZLWbtFbjIeUd3Q-3xp5ZKVADjXfLMfj5dm6r4FDGrOxr9_VpT-tlw?purpose=inline"
+},
+{
+  "_id": 2,
+  "restaurant_id": 2,
+  "restaurant_name": "Pizza Corner",
+  "description": "Fresh Pizzas and Italian dishes",
+  "phone": "9876543211",
+  "address": "Adyar",
+  "city": "Chennai",
+  "rating": {
+    "$numberDecimal": "4.3"
+  },
+  "status": "Open",
+  "image_url": "https://images.openai.com/static-rsc-4/kL4yDeHHQsOpv75tVrX2IYFQBNl-Ksno_loXrU3JD6EJg1UWWuDr4ZX_gxwpEjy6K6c-vOkd9apsNzIJ2BWXgQAf78Lw7AZ5BqT1NjCADwG-4DPFa9ZtPdCDyVpC3ZeH8g2qABCVxrIZBemvbRmzUo6xCZK-gnmeesx52nzKrbM?purpose=inline"
+},
+{
+  "_id": 3,
+  "restaurant_id": 3,
+  "restaurant_name": "Dragon House",
+  "description": "Chinese and Asian Cuisine",
+  "phone": "9876543212",
+  "address": "T Nagar",
+  "city": "Chennai",
+  "rating": {
+    "$numberDecimal": "4.2"
+  },
+  "status": "Open",
+  "image_url": "https://wok-and-sushi-oberkirch.com/assets/images/dish-4.jpg?utm_source=chatgpt.com"
+},
+{
+  "_id": 4,
+  "restaurant_id": 4,
+  "restaurant_name": "Green Bowl",
+  "description": "Healthy and Vegetarian Food",
+  "phone": "9876543213",
+  "address": "Besant Nagar",
+  "city": "Chennai",
+  "rating": {
+    "$numberDecimal": "4.6"
+  },
+  "status": "Open",
+  "image_url": "https://www.timeoutdubai.com/cloud/timeoutdubai/2021/10/01/Life%E2%80%99n-one.jpg"
+}]

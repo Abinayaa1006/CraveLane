@@ -1,0 +1,55 @@
+[{
+  "_id": 2,
+  "customer_id": 2,
+  "name": "Abinayaa V",
+  "email": "abinayaa.test@gmail.com",
+  "phone": "7558165847",
+  "address": "Plot No-2D,Mathura Illam,Pandian Salai 2nd Street,Neelankarai",
+  "city": "Chennai",
+  "pincode": "600115",
+  "role": "admin"
+},
+{
+  "_id": 3,
+  "customer_id": 3,
+  "name": "Hamar",
+  "email": "hamar.test@gmail.com",
+  "phone": "7687765444",
+  "address": "kerala",
+  "city": "kerala",
+  "pincode": "600001",
+  "role": "customer"
+},
+{
+  "_id": 4,
+  "customer_id": 4,
+  "name": "Abinayaa V",
+  "email": "abinayaa1006@gmail.com",
+  "phone": "7558165847",
+  "address": "Plot No-2D,Mathura Illam,Pandian Salai 2nd Street\nNeelankarai",
+  "city": "Chennai",
+  "pincode": "600115",
+  "role": "customer"
+},
+{
+  "_id": 5,
+  "customer_id": 5,
+  "name": "Abinayaa V",
+  "email": "vabinayaa10@gmail.com",
+  "phone": "7687567422",
+  "address": "Plot No-2D,Mathura Illam,Pandian Salai 2nd Street\nNeelankarai",
+  "city": "Chennai",
+  "pincode": "600115",
+  "role": "customer"
+},
+{
+  "_id": 6,
+  "customer_id": 6,
+  "name": "Guhaprian",
+  "email": "guhaprianv@gmail.com",
+  "phone": "7358019744",
+  "address": "9/16 sixteen pillars Mandapam street, \nChidambaram",
+  "city": "Chidambaram",
+  "pincode": "608001",
+  "role": "customer"
+}]

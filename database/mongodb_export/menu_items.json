@@ -1,0 +1,130 @@
+[{
+  "_id": 1,
+  "menu_id": 1,
+  "restaurant_id": 1,
+  "item_name": "Paneer Butter Masala",
+  "description": "Creamy Paneer Curry",
+  "price": {
+    "$numberDecimal": "220.00"
+  },
+  "category": "Main Course",
+  "availability": true,
+  "image_url": "https://hospitalitycareerprofile.com/uploads/images/202605/image_1200x800_69f84b925ad94.webp?utm_source=chatgpt.com"
+},
+{
+  "_id": 2,
+  "menu_id": 2,
+  "restaurant_id": 1,
+  "item_name": "Butter Naan",
+  "description": "Soft Indian Naan",
+  "price": {
+    "$numberDecimal": "60.00"
+  },
+  "category": "Bread",
+  "availability": true,
+  "image_url": "https://jaiindiankitchen.com/media/products/butter-naan-jai-indian-kitchen.jpeg?utm_source=chatgpt.com"
+},
+{
+  "_id": 3,
+  "menu_id": 3,
+  "restaurant_id": 1,
+  "item_name": "Veg Biryani",
+  "description": "Aromatic Vegetable Biryani",
+  "price": {
+    "$numberDecimal": "180.00"
+  },
+  "category": "Rice",
+  "availability": true,
+  "image_url": "https://b.zmtcdn.com/data/pictures/chains/0/21450550/172719443780bf9dcf-9d47-4874-9fd4-64889f60cfec.png?utm_source=chatgpt.com"
+},
+{
+  "_id": 4,
+  "menu_id": 4,
+  "restaurant_id": 2,
+  "item_name": "Margherita Pizza",
+  "description": "Classic Cheese Pizza",
+  "price": {
+    "$numberDecimal": "250.00"
+  },
+  "category": "Pizza",
+  "availability": true,
+  "image_url": "https://zucchini.co.ke/cdn/shop/files/20220211142645-margherita-9920.webp?v=1754662141&utm_source=chatgpt.com"
+},
+{
+  "_id": 5,
+  "menu_id": 5,
+  "restaurant_id": 2,
+  "item_name": "Farmhouse Pizza",
+  "description": "Loaded Vegetable Pizza",
+  "price": {
+    "$numberDecimal": "320.00"
+  },
+  "category": "Pizza",
+  "availability": true,
+  "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa17TFoTW5heyDUM5peDbWhQ7461WLB0aFBxWb-7oDdm6eUeLdIuItSjw&s=10"
+},
+{
+  "_id": 6,
+  "menu_id": 6,
+  "restaurant_id": 2,
+  "item_name": "Garlic Bread",
+  "description": "Crispy Garlic Bread",
+  "price": {
+    "$numberDecimal": "150.00"
+  },
+  "category": "Sides",
+  "availability": true,
+  "image_url": "https://snapcalorie-webflow-website.s3.us-east-2.amazonaws.com/media/food_pics_v2/garlic_bread.jpg?utm_source=chatgpt.com"
+},
+{
+  "_id": 7,
+  "menu_id": 7,
+  "restaurant_id": 3,
+  "item_name": "Veg Noodles",
+  "description": "Stir-Fried Noodles",
+  "price": {
+    "$numberDecimal": "190.00"
+  },
+  "category": "Noodles",
+  "availability": true,
+  "image_url": "https://media-assets.swiggy.com/swiggy/image/upload/fl_lossy%2Cf_auto%2Cq_auto/FOOD_CATALOG/IMAGES/CMS/2025/11/10/c00de345-c469-46d7-a4e5-a46d03c91fcf_42bbd38b-4d67-42df-872b-1cdac6ffc49d.jpg?utm_source=chatgpt.com"
+},
+{
+  "_id": 8,
+  "menu_id": 8,
+  "restaurant_id": 3,
+  "item_name": "Veg Fried Rice",
+  "description": "Chinese Style Fried Rice",
+  "price": {
+    "$numberDecimal": "180.00"
+  },
+  "category": "Rice",
+  "availability": true,
+  "image_url": "https://static.vecteezy.com/system/resources/thumbnails/040/986/112/small/ai-generated-indian-biryani-rice-professional-advertising-foodgraphy-photo.jpg"
+},
+{
+  "_id": 9,
+  "menu_id": 9,
+  "restaurant_id": 4,
+  "item_name": "Veg Buddha Bowl",
+  "description": "Healthy Vegetable Bowl",
+  "price": {
+    "$numberDecimal": "280.00"
+  },
+  "category": "Healthy",
+  "availability": true,
+  "image_url": "https://recettox.com/cdn-cgi/image/fit%3Dcontain%2Cwidth%3D768%2Cquality%3D80%2Cformat%3Dauto%2C/assets/images/1751732021084-1cufvqi6.webp?utm_source=chatgpt.com"
+},
+{
+  "_id": 10,
+  "menu_id": 10,
+  "restaurant_id": 4,
+  "item_name": "Avocado Salad",
+  "description": "Fresh Avocado Salad",
+  "price": {
+    "$numberDecimal": "250.00"
+  },
+  "category": "Salad",
+  "availability": true,
+  "image_url": "https://snapcalorie-webflow-website.s3.us-east-2.amazonaws.com/media/food_pics_v2/medium/avocado_salad_with_red_onion_and_tomato.jpg?utm_source=chatgpt.com"
+}]
