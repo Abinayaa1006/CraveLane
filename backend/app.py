@@ -9,6 +9,7 @@ load_dotenv()
 import smtplib
 from email.message import EmailMessage
 from decimal import Decimal
+from datetime import timedelta
 from functools import wraps
 
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -1194,6 +1195,8 @@ def get_customer_orders(customer_id):
                 o.City,
                 o.Pincode,
                 o.Order_Status,
+                o.Order_Date,
+                TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), NOW()) AS db_utc_offset_minutes,
                 o.Payment_Method,
                 o.Payment_Status,
                 r.Restaurant_Name,
@@ -1230,6 +1233,14 @@ def get_customer_orders(customer_id):
                     "city": row["City"],
                     "pincode": row["Pincode"],
                     "order_status": row["Order_Status"],
+                    "order_date": (
+                        (
+                            row["Order_Date"] + timedelta(
+                                minutes=330 - int(row["db_utc_offset_minutes"] or 0)
+                            )
+                        ).isoformat() + "+05:30"
+                        if row["Order_Date"] else None
+                    ),
                     "payment_method": row["Payment_Method"],
                     "payment_status": row["Payment_Status"],
                     "restaurant_names": [],
@@ -1267,6 +1278,90 @@ def get_customer_orders(customer_id):
         app.logger.exception("Could not fetch customer orders")
         return jsonify({
             "message": "Could not fetch your orders."
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+# --------------------------------------------------
+# CUSTOMER CANCEL ORDER
+# PUT /orders/<order_id>/cancel
+# --------------------------------------------------
+
+@app.route("/orders/<int:order_id>/cancel", methods=["PUT"])
+@require_auth
+def cancel_customer_order(order_id):
+    if request.current_user.get("role") != "customer":
+        return jsonify({"message": "Customer access required."}), 403
+
+    customer_id = request.current_user.get("customer_id")
+    db = None
+    cursor = None
+
+    try:
+        db = get_connection()
+        db.start_transaction()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT Order_ID, Order_Status, Payment_Status
+            FROM orders
+            WHERE Order_ID = %s AND Customer_ID = %s
+            FOR UPDATE
+            """,
+            (order_id, customer_id)
+        )
+        order = cursor.fetchone()
+
+        if not order:
+            db.rollback()
+            return jsonify({"message": "Order not found."}), 404
+
+        if (order.get("Order_Status") or "").strip().lower() != "pending":
+            db.rollback()
+            return jsonify({
+                "message": "Only pending orders can be cancelled."
+            }), 400
+
+        payment_status = (order.get("Payment_Status") or "").strip().lower()
+        if payment_status in {"paid", "completed", "captured"}:
+            db.rollback()
+            return jsonify({
+                "message": (
+                    "This order has already been paid. Please contact support "
+                    "for cancellation and refund assistance."
+                )
+            }), 400
+
+        cursor.execute(
+            """
+            UPDATE orders
+            SET Order_Status = 'Cancelled'
+            WHERE Order_ID = %s AND Customer_ID = %s
+            """,
+            (order_id, customer_id)
+        )
+
+        enqueue_sync_event(cursor, "orders", order_id, "upsert")
+        db.commit()
+
+        return jsonify({
+            "message": "Your order has been cancelled successfully.",
+            "order_id": order_id,
+            "order_status": "Cancelled"
+        }), 200
+
+    except Exception:
+        if db:
+            db.rollback()
+        app.logger.exception("Customer order cancellation failed")
+        return jsonify({
+            "message": "Could not cancel your order. Please try again."
         }), 500
 
     finally:
@@ -1877,12 +1972,14 @@ def admin_dashboard_stats():
 
         # Registered customers (excluding admin accounts)
         cursor.execute("""
-            SELECT COUNT(*) AS total_customers
-            FROM customer
-            WHERE Role = 'customer'
-        """)
+    SELECT COUNT(*) AS total_customers
+    FROM customer
+    WHERE LOWER(TRIM(Role)) = 'customer'
+""")
 
         customer_result = cursor.fetchone()
+
+        
 
 
         # Total restaurants
@@ -2458,6 +2555,8 @@ def admin_get_orders():
                 o.City AS city,
                 o.Pincode AS pincode,
                 o.Order_Status AS order_status,
+                o.Order_Date AS order_date,
+                TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), NOW()) AS db_utc_offset_minutes,
                 o.Payment_Method AS payment_method,
                 o.Payment_Status AS payment_status,
                 r.Restaurant_Name AS restaurant_name,
@@ -2496,6 +2595,14 @@ def admin_get_orders():
                     "city": row["city"] or "",
                     "pincode": row["pincode"] or "",
                     "order_status": row["order_status"] or "Pending",
+                    "order_date": (
+                        (
+                            row["order_date"] + timedelta(
+                                minutes=330 - int(row["db_utc_offset_minutes"] or 0)
+                            )
+                        ).isoformat() + "+05:30"
+                        if row["order_date"] else None
+                    ),
                     "payment_method": row["payment_method"] or "",
                     "payment_status": row["payment_status"] or "",
                     "restaurant_names": [],
@@ -2543,6 +2650,7 @@ def admin_get_orders():
 
 
 
+
 # =====================================================
 # ADMIN DATABASE MONITORING & SYNC CONTROL
 # =====================================================
@@ -2551,11 +2659,13 @@ def admin_get_orders():
 @require_admin
 def admin_database_health():
     """Return MySQL/MongoDB counts and transactional outbox status."""
+
     mysql_db = None
     mysql_cursor = None
     mongo_connected = False
     mongo_counts = {}
     mysql_counts = {}
+
     outbox = {
         "pending": 0,
         "processing": 0,
@@ -2564,6 +2674,9 @@ def admin_database_health():
         "recent_events": []
     }
 
+    # -----------------------------
+    # MYSQL DATABASE MONITORING
+    # -----------------------------
     try:
         mysql_db = get_connection()
         mysql_cursor = mysql_db.cursor(dictionary=True)
@@ -2577,58 +2690,97 @@ def admin_database_health():
         }
 
         for label, table_name in mysql_tables.items():
-            mysql_cursor.execute(f"SELECT COUNT(*) AS total FROM `{table_name}`")
+
+            # Exclude admin accounts from customer count
+            if label == "customers":
+                mysql_cursor.execute("""
+                    SELECT COUNT(*) AS total
+                    FROM customer
+                    WHERE LOWER(TRIM(Role)) = 'customer'
+                """)
+            else:
+                mysql_cursor.execute(
+                    f"SELECT COUNT(*) AS total FROM `{table_name}`"
+                )
+
             row = mysql_cursor.fetchone()
             mysql_counts[label] = int(row["total"] or 0)
 
+        # Synchronization queue status
         try:
             mysql_cursor.execute("""
                 SELECT Status, COUNT(*) AS total
                 FROM sync_outbox
                 GROUP BY Status
             """)
+
             for row in mysql_cursor.fetchall():
                 status = (row.get("Status") or "").lower()
+
                 if status in outbox:
                     outbox[status] = int(row["total"] or 0)
 
+            # Recent synchronization events
             mysql_cursor.execute("""
-                SELECT Event_ID, Entity_Type, Entity_ID, Operation,
-                       Status, Attempts, Created_At, Processed_At, Last_Error
+                SELECT
+                    Event_ID,
+                    Entity_Type,
+                    Entity_ID,
+                    Operation,
+                    Status,
+                    Attempts,
+                    Created_At,
+                    Processed_At,
+                    Last_Error
                 FROM sync_outbox
                 ORDER BY Event_ID DESC
                 LIMIT 10
             """)
+
             events = mysql_cursor.fetchall()
+
             for event in events:
                 for date_key in ("Created_At", "Processed_At"):
                     if event.get(date_key):
                         event[date_key] = event[date_key].isoformat()
+
                 event["Event_ID"] = int(event["Event_ID"])
                 event["Entity_ID"] = int(event["Entity_ID"])
                 event["Attempts"] = int(event["Attempts"] or 0)
-                # Avoid exposing stack traces or secrets in Last_Error.
+
                 if event.get("Last_Error"):
-                    event["Last_Error"] = str(event["Last_Error"])[:300]
+                    event["Last_Error"] = str(
+                        event["Last_Error"]
+                    )[:300]
+
             outbox["recent_events"] = events
+            outbox["available"] = True
+
         except Exception:
             app.logger.exception("Could not read sync_outbox")
             outbox["available"] = False
-        else:
-            outbox["available"] = True
 
     except Exception:
         app.logger.exception("Could not read MySQL monitoring data")
-        return jsonify({"message": "Could not load MySQL database status."}), 500
+
+        return jsonify({
+            "message": "Could not load MySQL database status."
+        }), 500
+
     finally:
         if mysql_cursor:
             mysql_cursor.close()
+
         if mysql_db:
             mysql_db.close()
 
+    # -----------------------------
+    # MONGODB DATABASE MONITORING
+    # -----------------------------
     try:
         mongo_db = connect_mongodb()
         mongo_connected = True
+
         mongo_collections = {
             "customers": "customers",
             "restaurants": "restaurants",
@@ -2636,13 +2788,34 @@ def admin_database_health():
             "orders": "orders",
             "reviews": "reviews"
         }
+
         for label, collection_name in mongo_collections.items():
-            mongo_counts[label] = mongo_db[collection_name].count_documents({})
+
+            if label == "customers":
+                # Count only customer accounts, not admin accounts
+                mongo_counts[label] = mongo_db[
+                    collection_name
+                ].count_documents({
+                    "role": {
+                        "$regex": "^customer$",
+                        "$options": "i"
+                    }
+                })
+
+            else:
+                mongo_counts[label] = mongo_db[
+                    collection_name
+                ].count_documents({})
+
     except Exception:
         app.logger.exception("Could not read MongoDB monitoring data")
+
     finally:
         close_mongodb()
 
+    # -----------------------------
+    # FINAL RESPONSE
+    # -----------------------------
     return jsonify({
         "mysql": {
             "connected": True,
@@ -2656,6 +2829,7 @@ def admin_database_health():
         },
         "sync": outbox
     }), 200
+
 
 
 @app.route("/admin/database/trigger-sync", methods=["POST"])

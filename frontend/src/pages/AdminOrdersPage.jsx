@@ -1,4 +1,3 @@
-
 import React, {
     useCallback,
     useEffect,
@@ -160,6 +159,28 @@ export default function AdminOrdersPage() {
 
 
     // =================================================
+    // ORDER DATE AND TIME
+    // =================================================
+
+    const formatOrderDate = (value) => {
+        if (!value) return "Date unavailable";
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+        return date.toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+        });
+    };
+
+
+    // =================================================
     // UPDATE ORDER STATUS
     // =================================================
 
@@ -218,8 +239,6 @@ export default function AdminOrdersPage() {
                 );
             }
 
-            // Update the order immediately in the UI.
-
             setOrders((previous) =>
                 previous.map((order) =>
                     Number(order.order_id) === Number(orderId)
@@ -230,8 +249,6 @@ export default function AdminOrdersPage() {
                         : order
                 )
             );
-
-            // Show success popup.
 
             notifyAdmin(
                 `Order #${orderId} status updated to ${newStatus}.`,
@@ -281,10 +298,7 @@ export default function AdminOrdersPage() {
 
         <div className="admin-page">
 
-            {/* GLOBAL ADMIN POPUPS */}
-
             <AdminToast />
-
 
             {/* SIDEBAR */}
 
@@ -537,6 +551,17 @@ export default function AdminOrdersPage() {
 
                                             <small>
                                                 {order.customer_email}
+                                            </small>
+
+                                            <small
+                                                className="admin-order-date"
+                                                style={{
+                                                    display: "block",
+                                                    marginTop: "5px"
+                                                }}
+                                            >
+                                                <strong>Ordered on:</strong>{" "}
+                                                {formatOrderDate(order.order_date)}
                                             </small>
 
                                         </div>
