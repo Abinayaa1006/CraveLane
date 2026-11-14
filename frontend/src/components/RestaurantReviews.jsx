@@ -278,33 +278,29 @@ setDeliveredOrders(delivered);
             year: "numeric"
         });
     };
-    const formatReviewDateTime = (dateValue) => {
+
+const formatReviewDateTime = (dateValue) => {
     if (!dateValue) return "";
 
-    // MySQL DATETIME has no timezone suffix.
-    // Treat it as IST; preserve timezone if one is already supplied.
-    const value = String(dateValue);
-    const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(value);
+    const [datePart, timePart] = String(dateValue).replace("T", " ").split(" ");
 
-    const date = new Date(
-        hasTimezone ? value : `${value}+05:30`
-    );
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hour, minute] = timePart.split(":").map(Number);
 
-    if (Number.isNaN(date.getTime())) return "";
+    const date = new Date(year, month - 1, day, hour, minute);
 
-    return (
-        date.toLocaleString("en-IN", {
-            timeZone: "Asia/Kolkata",
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true
-        }) + " IST"
-    );
+    return date.toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+    }) + " IST";
 };
 
+    
     // =========================================
     // LOADING STATE
     // =========================================
