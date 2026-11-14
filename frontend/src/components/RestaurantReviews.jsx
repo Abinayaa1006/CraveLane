@@ -130,24 +130,29 @@ export default function RestaurantReviews({ restaurantId }) {
                     ? data.orders
                     : [];
 
-            const delivered = orders.filter((order) => {
-                const status = String(
-                    order.order_status ||
-                    order.Order_Status ||
-                    ""
-                ).trim().toLowerCase();
+          const delivered = orders.filter((order) => {
+    const status = String(
+        order.order_status ||
+        order.Order_Status ||
+        ""
+    ).trim().toLowerCase();
 
-                return status === "delivered";
-            });
+    const belongsToRestaurant = (order.items || []).some(
+        (item) =>
+            Number(item.restaurant_id) === Number(restaurantId)
+    );
 
-            setDeliveredOrders(delivered);
+    return status === "delivered" && belongsToRestaurant;
+});
+
+setDeliveredOrders(delivered);
 
         } catch (err) {
             setError(
                 err.message || "Unable to load delivered orders."
             );
         }
-    }, [customerId]);
+    }, [customerId, restaurantId]);
 
     // =========================================
     // INITIAL LOAD

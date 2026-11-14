@@ -1201,6 +1201,7 @@ def get_customer_orders(customer_id):
                 o.Payment_Status,
                 r.Restaurant_Name,
                 oi.Menu_ID,
+                m.Restaurant_ID,
                 m.Item_Name,
                 m.Image_URL AS image_url,
                 oi.Quantity,
@@ -1256,6 +1257,7 @@ def get_customer_orders(customer_id):
             if row["Menu_ID"] is not None:
                 order["items"].append({
                     "menu_id": row["Menu_ID"],
+                    "restaurant_id": row["Restaurant_ID"],
                     "item_name": row["Item_Name"],
                     "image_url": row["image_url"],
                     "quantity": row["Quantity"],
