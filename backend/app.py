@@ -152,54 +152,44 @@ import json
 import urllib.request
 import urllib.error
 
-def send_reset_email(recipient_email, reset_link):
-    api_key = os.getenv("BREVO_API_KEY")
-    sender_email = os.getenv("MAIL_DEFAULT_SENDER")
 
-    if not api_key or not sender_email:
-        raise RuntimeError("Brevo API configuration is incomplete.")
+import os
+import json
+import urllib.request
+import urllib.error
+
+
+def send_reset_email(recipient_email, reset_link):
+    script_url = os.getenv("GMAIL_SCRIPT_URL")
+    secret = os.getenv("CRAVELANE_EMAIL_SECRET")
+
+    if not script_url or not secret:
+        raise RuntimeError("Gmail email service is not configured.")
 
     payload = {
-        "sender": {
-            "name": "CraveLane",
-            "email": sender_email
-        },
-        "to": [
-            {"email": recipient_email}
-        ],
-        "subject": "CraveLane - Password Reset",
-        "textContent": (
-            "Hello,\n\n"
-            "We received a request to reset your CraveLane password.\n\n"
-            "Click the link below to reset your password:\n\n"
-            f"{reset_link}\n\n"
-            "This link expires in 15 minutes.\n\n"
-            "If you did not request this, ignore this email.\n\n"
-            "Regards,\nCraveLane Team"
-        )
+        "secret": secret,
+        "to": recipient_email,
+        "reset_link": reset_link
     }
 
-    request_data = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
+    req = urllib.request.Request(
+        script_url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "accept": "application/json",
-            "api-key": api_key,
-            "content-type": "application/json"
-        },
+        headers={"Content-Type": "application/json"},
         method="POST"
     )
 
     try:
-        with urllib.request.urlopen(
-            request_data, timeout=20
-        ) as response:
-            if response.status not in (200, 201, 202):
-                raise RuntimeError("Brevo email sending failed.")
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
 
-    except urllib.error.HTTPError as error:
-        error_body = error.read().decode("utf-8", errors="replace")
-        app.logger.error("Brevo API error: %s", error_body)
+        if not result.get("success"):
+            raise RuntimeError(
+                result.get("message", "Gmail email sending failed.")
+            )
+
+    except Exception:
+        app.logger.exception("Gmail email sending failed")
         raise
 
 # --------------------------------------------------
