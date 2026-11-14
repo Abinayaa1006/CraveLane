@@ -146,42 +146,61 @@ def require_admin(function):
 # BREVO EMAIL CONFIGURATION
 # =====================================================
 
+
+import os
+import json
+import urllib.request
+import urllib.error
+
 def send_reset_email(recipient_email, reset_link):
-    smtp_server = os.getenv("MAIL_SERVER")
-    smtp_port = int(os.getenv("MAIL_PORT", "587"))
-    smtp_username = os.getenv("MAIL_USERNAME")
-    smtp_password = os.getenv("MAIL_PASSWORD")
+    api_key = os.getenv("BREVO_API_KEY")
     sender_email = os.getenv("MAIL_DEFAULT_SENDER")
 
-    if not all([smtp_server, smtp_username, smtp_password, sender_email]):
-        raise RuntimeError("Brevo SMTP configuration is incomplete.")
+    if not api_key or not sender_email:
+        raise RuntimeError("Brevo API configuration is incomplete.")
 
-    message = EmailMessage()
-    message["Subject"] = "CraveLane - Password Reset"
-    message["From"] = sender_email
-    message["To"] = recipient_email
-    message.set_content(f"""
-Hello,
+    payload = {
+        "sender": {
+            "name": "CraveLane",
+            "email": sender_email
+        },
+        "to": [
+            {"email": recipient_email}
+        ],
+        "subject": "CraveLane - Password Reset",
+        "textContent": (
+            "Hello,\n\n"
+            "We received a request to reset your CraveLane password.\n\n"
+            "Click the link below to reset your password:\n\n"
+            f"{reset_link}\n\n"
+            "This link expires in 15 minutes.\n\n"
+            "If you did not request this, ignore this email.\n\n"
+            "Regards,\nCraveLane Team"
+        )
+    }
 
-We received a request to reset your CraveLane account password.
+    request_data = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "accept": "application/json",
+            "api-key": api_key,
+            "content-type": "application/json"
+        },
+        method="POST"
+    )
 
-Click the link below to create a new password:
+    try:
+        with urllib.request.urlopen(
+            request_data, timeout=20
+        ) as response:
+            if response.status not in (200, 201, 202):
+                raise RuntimeError("Brevo email sending failed.")
 
-{reset_link}
-
-This link expires in 15 minutes.
-
-If you did not request a password reset, please ignore this email.
-
-Regards,
-CraveLane Team
-""")
-
-    with smtplib.SMTP(smtp_server, smtp_port, timeout=20) as server:
-        server.starttls()
-        server.login(smtp_username, smtp_password)
-        server.send_message(message)
-
+    except urllib.error.HTTPError as error:
+        error_body = error.read().decode("utf-8", errors="replace")
+        app.logger.error("Brevo API error: %s", error_body)
+        raise
 
 # --------------------------------------------------
 # HOME / HEALTH CHECK
