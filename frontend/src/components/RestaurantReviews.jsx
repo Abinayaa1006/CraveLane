@@ -278,6 +278,32 @@ setDeliveredOrders(delivered);
             year: "numeric"
         });
     };
+    const formatReviewDateTime = (dateValue) => {
+    if (!dateValue) return "";
+
+    // MySQL DATETIME has no timezone suffix.
+    // Treat it as IST; preserve timezone if one is already supplied.
+    const value = String(dateValue);
+    const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(value);
+
+    const date = new Date(
+        hasTimezone ? value : `${value}+05:30`
+    );
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    return (
+        date.toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+        }) + " IST"
+    );
+};
 
     // =========================================
     // LOADING STATE
@@ -523,8 +549,8 @@ setDeliveredOrders(delivered);
                                         </div>
 
                                         <span style={styles.date}>
-                                            {formatDate(reviewDate)}
-                                        </span>
+    {formatReviewDateTime(reviewDate)}
+</span>
                                     </div>
 
                                     {reviewComments && (

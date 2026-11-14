@@ -22,7 +22,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database.mysql_db import get_connection
 from database.sync_outbox import enqueue_sync_event
 from database.mongodb import connect_mongodb, close_mongodb
-
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
@@ -1684,7 +1685,9 @@ def submit_review():
             return jsonify({
                 "message": "You have already reviewed this restaurant for this order."
             }), 409
-
+        review_date = datetime.now(
+    ZoneInfo("Asia/Kolkata")
+).replace(tzinfo=None)
         cursor.execute(
             """
             INSERT INTO review (
@@ -1692,16 +1695,18 @@ def submit_review():
                 Restaurant_ID,
                 Order_ID,
                 Rating,
-                Comments
+                Comments,
+                Review_Date
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 customer_id,
                 restaurant_id,
                 order_id,
                 rating,
-                comments
+                comments,
+                review_date
             )
         )
 
